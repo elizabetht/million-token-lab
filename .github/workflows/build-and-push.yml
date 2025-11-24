@@ -14,6 +14,13 @@ jobs:
   build-and-push:
     runs-on: ubuntu-latest
     steps:
+      - name: Free up disk space
+        run: |
+          docker system prune -af --volumes || true
+          sudo rm -rf /usr/share/dotnet || true
+          sudo rm -rf /opt/ghc || true
+          sudo rm -rf /opt/hostedtoolcache || true
+          
       - name: Checkout
         uses: actions/checkout@v4
 

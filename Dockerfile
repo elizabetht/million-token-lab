@@ -2,7 +2,7 @@
 FROM vllm/vllm-openai:v0.11.2
 
 # Optional tools (health checks, debugging)
-RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
+# RUN apt-get update && apt-get install -y curl && rm -rf /var/lib/apt/lists/*
 
 ENV PORT=8000
 ENV HOST=0.0.0.0
