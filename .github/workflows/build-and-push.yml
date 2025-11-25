@@ -63,6 +63,7 @@ jobs:
 
           echo "IMAGE=$IMAGE"   >> "$GITHUB_OUTPUT"
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
+          
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -71,6 +72,7 @@ jobs:
           tags: |
             ${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.VERSION }}
             ${{ steps.vars.outputs.IMAGE }}:latest
+
       - name: Update RunPod pod to new image
         env:
           RUNPOD_API_KEY: ${{ secrets.RUNPOD_API_KEY }}
@@ -123,7 +125,7 @@ jobs:
 
           echo "vLLM did not become ready in time."
           exit 1
-          
+
       - name: Run vLLM benchmark and compute cost per 1M tokens
         env:
           BENCH_BASE_URL: ${{ secrets.RUNPOD_BASE_URL }}   # e.g. https://<pod>-8000.proxy.runpod.net
