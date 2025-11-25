@@ -63,7 +63,7 @@ jobs:
 
           echo "IMAGE=$IMAGE"   >> "$GITHUB_OUTPUT"
           echo "VERSION=$VERSION" >> "$GITHUB_OUTPUT"
-          
+
       - name: Build and push
         uses: docker/build-push-action@v6
         with:
@@ -112,7 +112,7 @@ jobs:
 
           # Try for ~5 minutes (30 * 10s)
           for i in {1..30}; do
-            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${RUNPOD_BASE_URL}/v1/models" || true)
+            STATUS=$(curl -L -s -o /dev/null -w "%{http_code}" "${RUNPOD_BASE_URL}/v1/models" || true)
 
             if [ "$STATUS" = "200" ]; then
               echo "vLLM is ready (status 200)."
