@@ -99,6 +99,48 @@ jobs:
             --header "Authorization: Bearer ${RUNPOD_API_KEY}" \
             --header "Content-Type: application/json" \
             --data @body.json
-          
+
+      - name: Wait for vLLM to be ready
+        env:
+          RUNPOD_BASE_URL: ${{ secrets.RUNPOD_BASE_URL }}   # e.g. https://<pod>-8000.proxy.runpod.net
+        run: |
+          set -euo pipefail
+
+          echo "Waiting for vLLM at ${RUNPOD_BASE_URL}/v1/models"
+
+          # Try for ~5 minutes (30 * 10s)
+          for i in {1..30}; do
+            STATUS=$(curl -s -o /dev/null -w "%{http_code}" "${RUNPOD_BASE_URL}/v1/models" || true)
+
+            if [ "$STATUS" = "200" ]; then
+              echo "vLLM is ready (status 200)."
+              exit 0
+            fi
+
+            echo "Attempt $i: status=${STATUS}, retrying in 10s..."
+            sleep 10
+          done
+
+          echo "vLLM did not become ready in time."
+          exit 1
+      - name: Run vLLM benchmark and compute cost per 1M tokens
+        env:
+          BENCH_BASE_URL: ${{ secrets.RUNPOD_BASE_URL }}   # e.g. https://<pod>-8000.proxy.runpod.net
+          BENCH_MODEL: "llama-3.1-8b"                      # must match served model name
+          GPU_COST_PER_HOUR: "0.26"
+          BENCH_IMAGE_TAG: "${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.VERSION }}"
+          BENCH_RESULTS_PATH: "bench_results.json"
+        run: |
+          set -euo pipefail
+          python -m pip install --upgrade pip
+          pip install requests
+          python scripts/bench_inference.py
+
+      - name: Upload benchmark results artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: vllm-benchmark-${{ github.sha }}
+          path: bench_results.json
+          retention-days: 90    
       
 
