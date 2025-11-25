@@ -123,6 +123,7 @@ jobs:
 
           echo "vLLM did not become ready in time."
           exit 1
+          
       - name: Run vLLM benchmark and compute cost per 1M tokens
         env:
           BENCH_BASE_URL: ${{ secrets.RUNPOD_BASE_URL }}   # e.g. https://<pod>-8000.proxy.runpod.net
