@@ -78,7 +78,7 @@ jobs:
           RUNPOD_REGISTRY_AUTH_ID: ${{ secrets.RUNPOD_REGISTRY_AUTH_ID }} # can be empty if public
           HF_TOKEN: ${{ secrets.HF_TOKEN }}
         run: |
-          IMAGE_TAG="${IMAGE_REPO}:${VERSION}"
+          IMAGE_TAG="${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.VERSION }}"
 
           echo "Updating RunPod pod $RUNPOD_POD_ID to image $IMAGE_TAG"
 
