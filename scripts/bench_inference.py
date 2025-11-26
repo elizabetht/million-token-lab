@@ -6,7 +6,7 @@ import json
 import requests
 
 BASE_URL = os.environ["BENCH_BASE_URL"].rstrip("/")  # e.g. https://<pod>-8000.proxy.runpod.net
-MODEL = os.environ.get("BENCH_MODEL", "llama-3.1-8b")
+MODEL = os.environ.get("BENCH_MODEL", "meta-llama/Llama-3.1-8B-Instruct")
 GPU_COST_PER_HOUR = float(os.environ.get("GPU_COST_PER_HOUR", "0.26"))  # dollars/hour
 
 HEADERS = {
