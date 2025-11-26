@@ -129,7 +129,7 @@ jobs:
       - name: Run vLLM benchmark and compute cost per 1M tokens
         env:
           BENCH_BASE_URL: ${{ secrets.RUNPOD_BASE_URL }}   # e.g. https://<pod>-8000.proxy.runpod.net
-          BENCH_MODEL: "llama-3.1-8b"                      # must match served model name
+          BENCH_MODEL: "meta-llama/Llama-3.1-8B-Instruct"                      # must match served model name
           GPU_COST_PER_HOUR: "0.26"
           BENCH_IMAGE_TAG: "${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.VERSION }}"
           BENCH_RESULTS_PATH: "bench_results.json"
