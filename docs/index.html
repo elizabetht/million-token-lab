@@ -356,11 +356,11 @@
         <p style="font-size: 13px; margin: 4px 0 6px;">
           OpenAI-compatible <code class="inline">/v1/chat/completions</code>:
         </p>
-        <pre><code id="endpoint-code">POST https://your-api-base.example.com/v1/chat/completions
+        <pre><code id="endpoint-code">POST https://xv28w4892bizfd-8000.proxy.runpod.net/v1/chat/completions
 Content-Type: application/json</code></pre>
 
         <p style="font-size: 13px; margin: 4px 0 6px;">Example request:</p>
-        <pre><code id="curl-example">curl https://your-api-base.example.com/v1/chat/completions \
+        <pre><code id="curl-example">curl https://xv28w4892bizfd-8000.proxy.runpod.net/v1/chat/completions \
   -H "Content-Type: application/json" \
   -d '{
     "model": "llama-8b-instruct",
@@ -439,7 +439,7 @@ Content-Type: application/json</code></pre>
     // ============================
 
     // If you have a single shared vLLM endpoint, set this and omit baseUrl per model:
-    const DEFAULT_API_BASE_URL = "https://your-api-base.example.com";
+    const DEFAULT_API_BASE_URL = "https://xv28w4892bizfd-8000.proxy.runpod.net";
 
     // Models & instances.
     // backendName must match what your vLLM server expects in the `model` field
@@ -474,7 +474,7 @@ Content-Type: application/json</code></pre>
         context: "4K tokens",
         gpu: "RTX 4000 SFF · 8GB",
         instanceLabel: "Small instance",
-        baseUrl: "https://your-other-api-base.example.com", // different pod/instance
+        baseUrl: "https://xv28w4892bizfd-8000.proxy.runpod.net", // different pod/instance
         inputPricePerM: 0.0100,
         outputPricePerM: 0.4000,
         description: "Small-footprint model for simple tasks where latency and cost matter most."
