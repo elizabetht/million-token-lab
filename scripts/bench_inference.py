@@ -1,217 +1,369 @@
 #!/usr/bin/env python
+"""
+Concurrent vLLM Benchmark Script
+
+Sends N requests concurrently using asyncio/httpx to allow vLLM to batch them.
+This provides realistic throughput numbers for batched workloads.
+"""
 import os
 import time
 import math
 import json
-import requests
+import asyncio
+import statistics
+from dataclasses import dataclass, field
 
-BASE_URL = os.environ["BENCH_BASE_URL"].rstrip("/")  # e.g. https://<pod>-8000.proxy.runpod.net
+import httpx
+
+# Configuration from environment
+BASE_URL = os.environ["BENCH_BASE_URL"].rstrip("/")
 MODEL = os.environ.get("BENCH_MODEL", "meta-llama/Llama-3.1-8B-Instruct")
-GPU_COST_PER_HOUR = float(os.environ.get("GPU_COST_PER_HOUR", "0.26"))  # dollars/hour
+GPU_COST_PER_HOUR = float(os.environ.get("GPU_COST_PER_HOUR", "0.26"))
 
-# Retry configuration for transient failures
+# Concurrency settings
+CONCURRENCY = int(os.environ.get("CONCURRENCY", "32"))  # Parallel requests
+NUM_REQUESTS = int(os.environ.get("NUM_REQUESTS", "64"))  # Total requests per benchmark
+MAX_NEW_TOKENS = int(os.environ.get("MAX_NEW_TOKENS", "128"))  # Tokens to generate
+
+# Retry configuration
 MAX_RETRIES = 3
-RETRY_DELAY = 5  # seconds
-
-HEADERS = {
-    "Content-Type": "application/json",
-    # If you front this with LiteLLM or require an API key, add auth here:
-    # "Authorization": f"Bearer {os.environ.get('BENCH_API_KEY')}",
-}
+RETRY_DELAYS = [2, 4, 8]  # Exponential backoff
 
 
-def make_request_with_retry(url, payload, timeout, request_name="request"):
-    """
-    Make a POST request with retry logic for transient failures.
-    Returns (response_data, elapsed_time) on success.
-    """
-    last_error = None
+@dataclass
+class RequestResult:
+    """Result from a single request."""
+    success: bool
+    prompt_tokens: int = 0
+    completion_tokens: int = 0
+    latency_sec: float = 0.0
+    error: str = ""
+
+
+@dataclass
+class BenchmarkResult:
+    """Aggregated benchmark results."""
+    total_prompt_tokens: int = 0
+    total_completion_tokens: int = 0
+    total_wall_time_sec: float = 0.0
+    successful_requests: int = 0
+    failed_requests: int = 0
+    latencies: list = field(default_factory=list)
+    
+    @property
+    def prompt_tokens_per_sec(self) -> float:
+        if self.total_wall_time_sec <= 0:
+            return 0.0
+        return self.total_prompt_tokens / self.total_wall_time_sec
+    
+    @property
+    def completion_tokens_per_sec(self) -> float:
+        if self.total_wall_time_sec <= 0:
+            return 0.0
+        return self.total_completion_tokens / self.total_wall_time_sec
+    
+    @property
+    def p50_latency(self) -> float:
+        if not self.latencies:
+            return 0.0
+        return statistics.median(self.latencies)
+    
+    @property
+    def p95_latency(self) -> float:
+        if not self.latencies:
+            return 0.0
+        sorted_lat = sorted(self.latencies)
+        idx = int(len(sorted_lat) * 0.95)
+        return sorted_lat[min(idx, len(sorted_lat) - 1)]
+    
+    @property
+    def p99_latency(self) -> float:
+        if not self.latencies:
+            return 0.0
+        sorted_lat = sorted(self.latencies)
+        idx = int(len(sorted_lat) * 0.99)
+        return sorted_lat[min(idx, len(sorted_lat) - 1)]
+
+
+async def make_request(
+    client: httpx.AsyncClient,
+    payload: dict,
+    request_id: int,
+    timeout: float = 120.0,
+) -> RequestResult:
+    """Make a single async request with retry logic."""
+    url = f"{BASE_URL}/v1/chat/completions"
     
     for attempt in range(MAX_RETRIES):
         try:
-            t0 = time.time()
-            resp = requests.post(
+            t0 = time.perf_counter()
+            response = await client.post(
                 url,
-                headers=HEADERS,
                 json=payload,
                 timeout=timeout,
             )
-            t1 = time.time()
+            latency = time.perf_counter() - t0
             
-            # Handle non-200 responses
-            if resp.status_code != 200:
-                error_text = resp.text[:500] if resp.text else "(empty response)"
-                if resp.status_code in (404, 502, 503, 504) and attempt < MAX_RETRIES - 1:
-                    print(f"  {request_name}: Got {resp.status_code}, retrying in {RETRY_DELAY}s... (attempt {attempt + 1}/{MAX_RETRIES})")
-                    time.sleep(RETRY_DELAY)
+            if response.status_code != 200:
+                if response.status_code in (404, 502, 503, 504) and attempt < MAX_RETRIES - 1:
+                    delay = RETRY_DELAYS[attempt]
+                    print(f"  Request {request_id}: Got {response.status_code}, retrying in {delay}s...")
+                    await asyncio.sleep(delay)
                     continue
-                raise RuntimeError(f"{request_name} failed: {resp.status_code} {error_text}")
+                return RequestResult(
+                    success=False,
+                    error=f"HTTP {response.status_code}: {response.text[:200]}"
+                )
             
-            # Try to parse JSON
-            try:
-                data = resp.json()
-            except Exception:
-                if attempt < MAX_RETRIES - 1:
-                    print(f"  {request_name}: JSON parse failed, retrying in {RETRY_DELAY}s... (attempt {attempt + 1}/{MAX_RETRIES})")
-                    time.sleep(RETRY_DELAY)
-                    continue
-                raise RuntimeError(f"{request_name} failed: status={resp.status_code}, invalid JSON: {resp.text[:500]}")
+            data = response.json()
+            usage = data.get("usage", {})
             
-            return data, (t1 - t0)
+            return RequestResult(
+                success=True,
+                prompt_tokens=usage.get("prompt_tokens", 0),
+                completion_tokens=usage.get("completion_tokens", 0),
+                latency_sec=latency,
+            )
             
-        except requests.exceptions.RequestException as e:
-            last_error = e
+        except httpx.TimeoutException:
             if attempt < MAX_RETRIES - 1:
-                print(f"  {request_name}: Network error ({e}), retrying in {RETRY_DELAY}s... (attempt {attempt + 1}/{MAX_RETRIES})")
-                time.sleep(RETRY_DELAY)
+                delay = RETRY_DELAYS[attempt]
+                print(f"  Request {request_id}: Timeout, retrying in {delay}s...")
+                await asyncio.sleep(delay)
                 continue
-            raise RuntimeError(f"{request_name} failed after {MAX_RETRIES} attempts: {e}")
+            return RequestResult(success=False, error="Timeout after retries")
+            
+        except Exception as e:
+            if attempt < MAX_RETRIES - 1:
+                delay = RETRY_DELAYS[attempt]
+                print(f"  Request {request_id}: Error ({e}), retrying in {delay}s...")
+                await asyncio.sleep(delay)
+                continue
+            return RequestResult(success=False, error=str(e))
     
-    raise RuntimeError(f"{request_name} failed after {MAX_RETRIES} attempts: {last_error}")
+    return RequestResult(success=False, error="Max retries exceeded")
 
 
-def run_prefill_bench(num_requests=20, prompt_repetitions=512):
+async def run_concurrent_benchmark(
+    messages: list,
+    max_tokens: int,
+    num_requests: int,
+    concurrency: int,
+    timeout: float = 120.0,
+    bench_name: str = "benchmark",
+) -> BenchmarkResult:
     """
-    Prefill-heavy benchmark: long prompts, tiny completion (1 token).
-    Measures input token throughput (T_in).
+    Run benchmark with concurrent requests.
+    
+    Sends requests in batches of `concurrency` size to allow vLLM to batch them.
     """
-    total_prompt_tokens = 0
-    total_time = 0.0
-
-    text = "hello world " * prompt_repetitions
-    messages = [{"role": "user", "content": text}]
-
-    for i in range(num_requests):
-        payload = {
-            "model": MODEL,
-            "messages": messages,
-            "max_tokens": 1,
-            "temperature": 0.0,
-        }
+    print(f"\n{bench_name}: Sending {num_requests} requests with concurrency={concurrency}")
+    
+    result = BenchmarkResult()
+    
+    async with httpx.AsyncClient(
+        headers={"Content-Type": "application/json"},
+        http2=True,  # Enable HTTP/2 for better connection reuse
+    ) as client:
         
-        data, elapsed = make_request_with_retry(
-            f"{BASE_URL}/v1/chat/completions",
-            payload,
-            timeout=120,
-            request_name=f"Prefill request {i+1}/{num_requests}"
-        )
+        # Process requests in batches
+        wall_start = time.perf_counter()
+        
+        for batch_start in range(0, num_requests, concurrency):
+            batch_end = min(batch_start + concurrency, num_requests)
+            batch_size = batch_end - batch_start
+            
+            # Create tasks for this batch
+            tasks = []
+            for i in range(batch_start, batch_end):
+                payload = {
+                    "model": MODEL,
+                    "messages": messages,
+                    "max_tokens": max_tokens,
+                    "temperature": 0.0,
+                }
+                tasks.append(make_request(client, payload, i + 1, timeout))
+            
+            # Execute batch concurrently
+            batch_results = await asyncio.gather(*tasks)
+            
+            # Aggregate results
+            for r in batch_results:
+                if r.success:
+                    result.successful_requests += 1
+                    result.total_prompt_tokens += r.prompt_tokens
+                    result.total_completion_tokens += r.completion_tokens
+                    result.latencies.append(r.latency_sec)
+                else:
+                    result.failed_requests += 1
+                    print(f"  Failed: {r.error}")
+            
+            # Progress update
+            completed = batch_end
+            print(f"  Progress: {completed}/{num_requests} requests completed")
+        
+        result.total_wall_time_sec = time.perf_counter() - wall_start
+    
+    return result
 
-        usage = data.get("usage", {})
-        total_prompt_tokens += usage.get("prompt_tokens", 0)
-        total_time += elapsed
 
-    if total_time == 0:
-        return 0.0, total_prompt_tokens, total_time
+async def run_prefill_benchmark() -> BenchmarkResult:
+    """
+    Prefill-heavy benchmark: long prompts, minimal output.
+    Measures input token throughput.
+    """
+    # Create a long prompt (~1000 tokens)
+    long_text = "The quick brown fox jumps over the lazy dog. " * 100
+    messages = [{"role": "user", "content": long_text}]
+    
+    return await run_concurrent_benchmark(
+        messages=messages,
+        max_tokens=1,  # Minimal output to focus on prefill
+        num_requests=NUM_REQUESTS,
+        concurrency=CONCURRENCY,
+        timeout=120.0,
+        bench_name="PREFILL benchmark",
+    )
 
-    t_in = total_prompt_tokens / total_time
-    return t_in, total_prompt_tokens, total_time
 
-
-def run_decode_bench(num_requests=20, max_tokens=256):
+async def run_decode_benchmark() -> BenchmarkResult:
     """
     Decode-heavy benchmark: short prompts, larger completions.
-    Measures output token throughput (T_out).
+    Measures output token throughput.
     """
-    total_completion_tokens = 0
-    total_time = 0.0
-
-    messages = [{"role": "user", "content": "Explain something interesting about large language models."}]
-
-    for i in range(num_requests):
-        payload = {
-            "model": MODEL,
-            "messages": messages,
-            "max_tokens": max_tokens,
-            "temperature": 0.0,
-        }
-        
-        data, elapsed = make_request_with_retry(
-            f"{BASE_URL}/v1/chat/completions",
-            payload,
-            timeout=300,
-            request_name=f"Decode request {i+1}/{num_requests}"
-        )
-
-        usage = data.get("usage", {})
-        total_completion_tokens += usage.get("completion_tokens", 0)
-        total_time += elapsed
-
-    if total_time == 0:
-        return 0.0, total_completion_tokens, total_time
-
-    t_out = total_completion_tokens / total_time
-    return t_out, total_completion_tokens, total_time
+    messages = [{"role": "user", "content": "Write a detailed essay about the history of artificial intelligence."}]
+    
+    return await run_concurrent_benchmark(
+        messages=messages,
+        max_tokens=MAX_NEW_TOKENS,
+        num_requests=NUM_REQUESTS,
+        concurrency=CONCURRENCY,
+        timeout=300.0,
+        bench_name="DECODE benchmark",
+    )
 
 
-def cost_per_million_tokens(tokens_per_second, gpu_cost_per_hour):
+def cost_per_million_tokens(tokens_per_second: float, gpu_cost_per_hour: float) -> float:
+    """Calculate cost per 1M tokens based on throughput."""
     if tokens_per_second <= 0:
         return math.inf
-    # Cost per 1M tokens = (hourly_cost * 1e6) / (TPS * 3600)
     return gpu_cost_per_hour * 1_000_000 / (tokens_per_second * 3600.0)
 
 
-def main():
-    print(f"Benchmarking model={MODEL} at {BASE_URL}")
-    print(f"GPU_COST_PER_HOUR={GPU_COST_PER_HOUR}")
-
-    # Prefill benchmark
-    t_in, total_in_tokens, t_in_time = run_prefill_bench()
-    cost_in = cost_per_million_tokens(t_in, GPU_COST_PER_HOUR)
-
-    # Decode benchmark
-    t_out, total_out_tokens, t_out_time = run_decode_bench()
-    cost_out = cost_per_million_tokens(t_out, GPU_COST_PER_HOUR)
-
-    # Metadata from CI env (if available)
+async def main_async():
+    print("=" * 60)
+    print("vLLM Concurrent Benchmark")
+    print("=" * 60)
+    print(f"Model: {MODEL}")
+    print(f"Base URL: {BASE_URL}")
+    print(f"GPU Cost: ${GPU_COST_PER_HOUR}/hour")
+    print(f"Concurrency: {CONCURRENCY}")
+    print(f"Requests per benchmark: {NUM_REQUESTS}")
+    print(f"Max new tokens (decode): {MAX_NEW_TOKENS}")
+    print("=" * 60)
+    
+    # Run benchmarks
+    prefill_result = await run_prefill_benchmark()
+    decode_result = await run_decode_benchmark()
+    
+    # Calculate costs
+    prefill_tps = prefill_result.prompt_tokens_per_sec
+    decode_tps = decode_result.completion_tokens_per_sec
+    
+    cost_in = cost_per_million_tokens(prefill_tps, GPU_COST_PER_HOUR)
+    cost_out = cost_per_million_tokens(decode_tps, GPU_COST_PER_HOUR)
+    
+    # Print summary
+    print("\n" + "=" * 60)
+    print("RESULTS")
+    print("=" * 60)
+    
+    print("\n### Prefill (Input Tokens)")
+    print(f"  Successful requests: {prefill_result.successful_requests}/{NUM_REQUESTS}")
+    print(f"  Total input tokens: {prefill_result.total_prompt_tokens:,}")
+    print(f"  Wall time: {prefill_result.total_wall_time_sec:.2f}s")
+    print(f"  Throughput: {prefill_tps:.2f} tokens/sec")
+    print(f"  Cost per 1M tokens: ${cost_in:.4f}")
+    print(f"  Latency P50/P95/P99: {prefill_result.p50_latency:.2f}s / {prefill_result.p95_latency:.2f}s / {prefill_result.p99_latency:.2f}s")
+    
+    print("\n### Decode (Output Tokens)")
+    print(f"  Successful requests: {decode_result.successful_requests}/{NUM_REQUESTS}")
+    print(f"  Total output tokens: {decode_result.total_completion_tokens:,}")
+    print(f"  Wall time: {decode_result.total_wall_time_sec:.2f}s")
+    print(f"  Throughput: {decode_tps:.2f} tokens/sec")
+    print(f"  Cost per 1M tokens: ${cost_out:.4f}")
+    print(f"  Latency P50/P95/P99: {decode_result.p50_latency:.2f}s / {decode_result.p95_latency:.2f}s / {decode_result.p99_latency:.2f}s")
+    
+    # Build result JSON
     commit_sha = os.environ.get("GITHUB_SHA", "")
     ref_name = os.environ.get("GITHUB_REF_NAME", "")
     image_tag = os.environ.get("BENCH_IMAGE_TAG", "")
-
+    
     result = {
         "model": MODEL,
         "base_url": BASE_URL,
         "gpu_cost_per_hour": GPU_COST_PER_HOUR,
+        "concurrency": CONCURRENCY,
+        "num_requests": NUM_REQUESTS,
         "commit_sha": commit_sha,
         "ref": ref_name,
         "image_tag": image_tag,
         "prefill": {
-            "tokens_per_second": t_in,
-            "total_tokens": total_in_tokens,
-            "total_time_sec": t_in_time,
+            "tokens_per_second": prefill_tps,
+            "total_tokens": prefill_result.total_prompt_tokens,
+            "total_time_sec": prefill_result.total_wall_time_sec,
             "cost_per_million_tokens": cost_in,
+            "successful_requests": prefill_result.successful_requests,
+            "failed_requests": prefill_result.failed_requests,
+            "latency_p50": prefill_result.p50_latency,
+            "latency_p95": prefill_result.p95_latency,
+            "latency_p99": prefill_result.p99_latency,
         },
         "decode": {
-            "tokens_per_second": t_out,
-            "total_tokens": total_out_tokens,
-            "total_time_sec": t_out_time,
+            "tokens_per_second": decode_tps,
+            "total_tokens": decode_result.total_completion_tokens,
+            "total_time_sec": decode_result.total_wall_time_sec,
             "cost_per_million_tokens": cost_out,
+            "successful_requests": decode_result.successful_requests,
+            "failed_requests": decode_result.failed_requests,
+            "latency_p50": decode_result.p50_latency,
+            "latency_p95": decode_result.p95_latency,
+            "latency_p99": decode_result.p99_latency,
         },
     }
-
+    
     print("\n=== Benchmark summary (JSON) ===")
     print(json.dumps(result, indent=2))
-
-    # Write to JSON file for artifact upload
+    
+    # Write to file
     out_path = os.environ.get("BENCH_RESULTS_PATH", "bench_results.json")
     with open(out_path, "w") as f:
         json.dump(result, f, indent=2)
-
-    # Optional: write to GitHub Actions summary
+    print(f"\nResults saved to: {out_path}")
+    
+    # GitHub Actions summary
     summary_path = os.environ.get("GITHUB_STEP_SUMMARY")
     if summary_path:
         with open(summary_path, "a") as f:
-            f.write("## vLLM Benchmark Results\n\n")
+            f.write("## vLLM Benchmark Results (Concurrent)\n\n")
             f.write(f"- Model: `{MODEL}`\n")
             f.write(f"- Base URL: `{BASE_URL}`\n")
             f.write(f"- Image: `{image_tag}`\n")
             f.write(f"- Commit: `{commit_sha}` (`{ref_name}`)\n")
-            f.write(f"- GPU cost: `${GPU_COST_PER_HOUR}/hour`\n\n")
+            f.write(f"- GPU cost: `${GPU_COST_PER_HOUR}/hour`\n")
+            f.write(f"- Concurrency: `{CONCURRENCY}` | Requests: `{NUM_REQUESTS}`\n\n")
             f.write("### Prefill (input tokens)\n")
-            f.write(f"- Tokens/sec: **{t_in:.2f}**\n")
-            f.write(f"- Cost per 1M input tokens: **${cost_in:.4f}**\n\n")
+            f.write(f"- Throughput: **{prefill_tps:.2f} tok/s**\n")
+            f.write(f"- Cost per 1M tokens: **${cost_in:.4f}**\n")
+            f.write(f"- Latency P50/P95/P99: {prefill_result.p50_latency:.2f}s / {prefill_result.p95_latency:.2f}s / {prefill_result.p99_latency:.2f}s\n\n")
             f.write("### Decode (output tokens)\n")
-            f.write(f"- Tokens/sec: **{t_out:.2f}**\n")
-            f.write(f"- Cost per 1M output tokens: **${cost_out:.4f}**\n\n")
+            f.write(f"- Throughput: **{decode_tps:.2f} tok/s**\n")
+            f.write(f"- Cost per 1M tokens: **${cost_out:.4f}**\n")
+            f.write(f"- Latency P50/P95/P99: {decode_result.p50_latency:.2f}s / {decode_result.p95_latency:.2f}s / {decode_result.p99_latency:.2f}s\n\n")
+
+
+def main():
+    asyncio.run(main_async())
 
 
 if __name__ == "__main__":

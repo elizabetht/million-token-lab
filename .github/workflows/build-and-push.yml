@@ -133,10 +133,13 @@ jobs:
           GPU_COST_PER_HOUR: "0.26"
           BENCH_IMAGE_TAG: "${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.VERSION }}"
           BENCH_RESULTS_PATH: "bench_results.json"
+          CONCURRENCY: "32"
+          NUM_REQUESTS: "64"
+          MAX_NEW_TOKENS: "128"
         run: |
           set -euo pipefail
           python -m pip install --upgrade pip
-          pip install requests
+          pip install httpx
           python scripts/bench_inference.py
 
       - name: Update index.html with benchmark pricing
