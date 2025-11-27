@@ -477,7 +477,7 @@
     // ============================
 
     // If you have a single shared vLLM endpoint, set this and omit baseUrl per model:
-    const DEFAULT_API_BASE_URL = "https://xv28w4892bizfd-8000.proxy.runpod.net";
+    const DEFAULT_API_BASE_URL = "https://fsbt1ro4nvwgwf-8000.proxy.runpod.net";
 
     // Models & instances.
     // backendName must match what your vLLM server expects in the `model` field
@@ -512,7 +512,7 @@
         context: "4K tokens",
         gpu: "RTX 4000 SFF · 8GB",
         instanceLabel: "Small instance",
-        baseUrl: "https://fsbt1ro4nvwgwf-8000.proxy.runpod.net", // different pod/instance
+        baseUrl: DEFAULT_API_BASE_URL, // use default endpoint
         inputPricePerM: 0.0100,
         outputPricePerM: 0.4000,
         description: "Small-footprint model for simple tasks where latency and cost matter most."
