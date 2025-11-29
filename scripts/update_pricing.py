@@ -85,14 +85,14 @@ def update_model_pricing(html_content: str, model_key: str, input_price: float, 
     # Update inputPricePerM
     updated_block = re.sub(
         r'inputPricePerM:\s*[\d.]+',
-        f'inputPricePerM: {input_price:.4f}',
+        f'inputPricePerM: {input_price:.2f}',
         model_block
     )
     
     # Update outputPricePerM
     updated_block = re.sub(
         r'outputPricePerM:\s*[\d.]+',
-        f'outputPricePerM: {output_price:.4f}',
+        f'outputPricePerM: {output_price:.2f}',
         updated_block
     )
     
@@ -139,8 +139,8 @@ def main():
     input_price = prefill.get("cost_per_million_tokens", 0)
     output_price = decode.get("cost_per_million_tokens", 0)
     
-    print(f"  Input price (per 1M tokens):  ${input_price:.4f}")
-    print(f"  Output price (per 1M tokens): ${output_price:.4f}")
+    print(f"  Input price (per 1M tokens):  ${input_price:.2f}")
+    print(f"  Output price (per 1M tokens): ${output_price:.2f}")
 
     # Load HTML file
     if not os.path.exists(args.html):
