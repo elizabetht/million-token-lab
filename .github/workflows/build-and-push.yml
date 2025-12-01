@@ -83,12 +83,17 @@ jobs:
 
           echo "Updating RunPod pod ${RUNPOD_POD_ID} to image ${IMAGE_TAG}"
 
+          # Write JSON to file to avoid escaping issues
+          echo "{\"imageName\": \"${IMAGE_TAG}\"}" > /tmp/body.json
+          echo "Request body:"
+          cat /tmp/body.json
+
           echo "Calling RunPod..."
-          curl -i -X POST \
-            "https://rest.runpod.io/v1/pods/${RUNPOD_POD_ID}/update" \
-            -H "Authorization: Bearer ${RUNPOD_API_KEY}" \
-            -H "Content-Type: application/json" \
-            -d "{\"imageName\": \"${IMAGE_TAG}\"}"
+          curl -i --request POST \
+            --url "https://rest.runpod.io/v1/pods/${RUNPOD_POD_ID}/update" \
+            --header 'Content-Type: application/json' \
+            --header "Authorization: Bearer ${RUNPOD_API_KEY}" \
+            --data-binary @/tmp/body.json
 
       - name: Wait for vLLM to be ready
         env:
