@@ -85,14 +85,10 @@ jobs:
           echo "Updating RunPod pod ${RUNPOD_POD_ID} to image ${IMAGE_TAG}"
 
           # Minimal JSON body: just change the imageName
-          cat <<EOF > body.json
-          {
-            "imageName": "${IMAGE_TAG}"
-          }
-          EOF
+          BODY='{"imageName": "'"${IMAGE_TAG}"'"}'
 
           echo "Request body:"
-          cat body.json
+          echo "${BODY}"
 
           echo "Calling RunPod..."
           curl -i \
@@ -100,7 +96,7 @@ jobs:
             --url "https://rest.runpod.io/v1/pods/${RUNPOD_POD_ID}/update" \
             --header "Authorization: Bearer ${RUNPOD_API_KEY}" \
             --header "Content-Type: application/json" \
-            --data @body.json
+            --data "${BODY}"
 
       - name: Wait for vLLM to be ready
         env:
