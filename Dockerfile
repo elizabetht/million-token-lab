@@ -6,7 +6,10 @@ FROM nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
-    python3-dev \
+    python3.12 \
+    python3.12-dev \
+    python3.12-venv \
+    python3-pip \
     cmake \
     ninja-build \
     && rm -rf /var/lib/apt/lists/*
