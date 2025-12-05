@@ -1,7 +1,10 @@
 # Dockerfile for vLLM on DGX Spark (Grace Hopper)
-# Builds vLLM from source with CUDA 12.1a architecture
+# Multi-stage build to reduce image size
 
-FROM nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04
+# ============================================
+# STAGE 1: BUILD
+# ============================================
+FROM nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04 AS builder
 
 # Install build dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -21,7 +24,7 @@ ENV PATH="/opt/venv/bin:$PATH"
 # Upgrade pip
 RUN pip install --upgrade pip
 
-# Set environment for DGX Spark (CUDA arch 12.1a)
+# Set environment for DGX Spark (CUDA arch 12.1f)
 ENV TORCH_CUDA_ARCH_LIST=12.1f
 ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
 ENV PATH=/usr/local/cuda/bin:$PATH
@@ -46,8 +49,39 @@ RUN git clone --depth 1 --branch ${VLLM_VERSION} https://github.com/vllm-project
 WORKDIR /vllm
 RUN python3 use_existing_torch.py 
 RUN pip install --no-cache-dir -r requirements/build.txt 
-RUN VLLM_USE_PRECOMPILED=1 pip install --editable . --prerelease=allow
+RUN pip install --editable . --prerelease=allow
 
-# RUN pip install vllm
+# Clean up build artifacts to reduce size
+RUN rm -rf /vllm/.git \
+    && rm -rf /root/.cache/pip \
+    && rm -rf /tmp/* \
+    && find /opt/venv -name "*.pyc" -delete \
+    && find /opt/venv -name "__pycache__" -type d -exec rm -rf {} + 2>/dev/null || true
 
-ENTRYPOINT [ "vllm", "serve" ]
+# ============================================
+# STAGE 2: RUNTIME
+# ============================================
+FROM nvidia/cuda:13.0.2-cudnn-runtime-ubuntu24.04 AS runtime
+
+# Install only runtime dependencies
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    python3.12 \
+    python3.12-venv \
+    libgomp1 \
+    && rm -rf /var/lib/apt/lists/* \
+    && apt-get clean
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Copy vLLM source (needed for editable install)
+COPY --from=builder /vllm /vllm
+
+ENV PATH="/opt/venv/bin:$PATH"
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+
+EXPOSE 8000
+
+# Usage: docker run image:tag <model-name> [vllm-options]
+# Example: docker run image:tag meta-llama/Llama-3.1-8B-Instruct --gpu-memory-utilization 0.7
+ENTRYPOINT ["vllm", "serve"]
