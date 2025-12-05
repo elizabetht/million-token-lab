@@ -11,16 +11,21 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ninja-build \
     && rm -rf /var/lib/apt/lists/*
 
+# Create virtual env
+RUN python3.12 -m venv /opt/venv
+ENV PATH="/opt/venv/bin:$PATH"
+
+# Upgrade pip
+RUN pip install --upgrade pip
+
 # Set environment for DGX Spark (CUDA arch 12.1a)
 ENV TORCH_CUDA_ARCH_LIST="12.1"
 ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
 ENV PATH=/usr/local/cuda/bin:$PATH
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
-ENV MAX_JOBS=8
 
-# Install PyTorch and dependencies
-RUN pip install --no-cache-dir \
-    torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu124
+# Install PyTorch + CUDA
+RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
 
 # Install vLLM dependencies
 RUN pip install --no-cache-dir \
@@ -38,7 +43,7 @@ RUN git clone --depth 1 --branch ${VLLM_VERSION} https://github.com/vllm-project
 WORKDIR /vllm
 RUN python3 use_existing_torch.py \
     && pip install --no-cache-dir -r requirements/build.txt \
-    && pip install --no-build-isolation -e .
+    && pip install --no-build-isolation -e . --prerelease=allow
 
 ENV PORT=8000
 ENV HOST=0.0.0.0
