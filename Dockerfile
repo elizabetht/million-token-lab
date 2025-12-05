@@ -46,7 +46,7 @@ RUN git clone --depth 1 --branch ${VLLM_VERSION} https://github.com/vllm-project
 WORKDIR /vllm
 RUN python3 use_existing_torch.py 
 RUN pip install --no-cache-dir -r requirements/build.txt 
-RUN pip install --no-build-isolation -e . --prerelease=allow
+RUN VLLM_USE_PRECOMPILED=1 pip install --editable . --prerelease=allow
 
 # RUN pip install vllm
 
