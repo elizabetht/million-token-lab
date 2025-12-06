@@ -33,18 +33,12 @@ RUN git clone https://github.com/vllm-project/vllm.git
 
 WORKDIR /app/vllm
 
-# # Merge PR #26844 for ARM64/Grace Hopper support
-# RUN git fetch origin pull/26844/head:pr-26844
-# RUN git -c user.name="CI Bot" -c user.email="ci@example.com" merge --no-ff --no-edit pr-26844
-
 RUN python3 use_existing_torch.py
-RUN sed -i "/flashinfer/d" requirements/cuda.txt
 RUN pip install -r requirements/build.txt
 
 # Set essential environment variables
-ENV TORCH_CUDA_ARCH_LIST=12.1a
+ENV TORCH_CUDA_ARCH_LIST=12.0f
 ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
-ENV TIKTOKEN_ENCODINGS_BASE=/app/tiktoken_encodings
 ENV CUDA_HOME=/usr/local/cuda
 
 # Install vLLM with local build (source build for ARM64)
