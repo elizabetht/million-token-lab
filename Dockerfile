@@ -46,7 +46,7 @@ RUN git clone --depth 1 --branch ${VLLM_VERSION} https://github.com/vllm-project
 WORKDIR /app/vllm
 RUN python3 use_existing_torch.py
 RUN pip install -r requirements/build.txt
-RUN pip install --no-build-isolation -e . -v --pre
+RUN VLLM_USE_PRECOMPILED=1 pip install --no-build-isolation -e . -v --pre
 
 # Clean up to reduce image size
 RUN rm -rf /app/vllm/.git \
