@@ -38,7 +38,7 @@ RUN pip install -r requirements/build.txt
 RUN rm -rf build dist vllm.egg-info
 ENV VLLM_USE_PRECOMPILED=1
 ENV VLLM_MAIN_CUDA_VERSION=13.0
-RUN pip install --no-build-isolation -e . -v --pre
+RUN VLLM_USE_PRECOMPILED=1 pip install --no-build-isolation -e . -v --pre
 
 # Clean up (optional)
 RUN rm -rf .git && rm -rf /root/.cache/pip && rm -rf /tmp/*
