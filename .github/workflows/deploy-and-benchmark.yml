@@ -145,6 +145,7 @@ jobs:
             --html docs/index.html
 
       - name: Commit and push pricing updates
+        working-directory: ${{ github.workspace }}
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
