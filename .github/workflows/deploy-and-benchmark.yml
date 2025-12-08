@@ -141,11 +141,20 @@ jobs:
           cat serve_bench.txt
           
           # Extract metrics from output
-          # vllm bench serve outputs lines like:
-          # "Input throughput: X.XX tokens/s"
-          # "Output throughput: X.XX tokens/s"
-          INPUT_TPS=$(grep -oP 'Input throughput:\s*\K[\d.]+' serve_bench.txt | tail -1 || echo "0")
-          OUTPUT_TPS=$(grep -oP 'Output throughput:\s*\K[\d.]+' serve_bench.txt | tail -1 || echo "0")
+          # vllm bench serve outputs: "Total Token throughput (tok/s):          1650.72"
+          # We use Total Token throughput for both input and output pricing as an approximation
+          TOTAL_TPS=$(grep -oP 'Total Token throughput \(tok/s\):\s*\K[\d.]+' serve_bench.txt | tail -1 || echo "0")
+          
+          # If total not found, try alternate patterns
+          if [ "$TOTAL_TPS" = "0" ] || [ -z "$TOTAL_TPS" ]; then
+            TOTAL_TPS=$(grep -oP 'Output throughput:\s*\K[\d.]+' serve_bench.txt | tail -1 || echo "0")
+          fi
+          
+          echo "Total throughput: $TOTAL_TPS tokens/s"
+          
+          # Use total throughput for both input and output pricing
+          INPUT_TPS=$TOTAL_TPS
+          OUTPUT_TPS=$TOTAL_TPS
           
           echo "Input throughput: $INPUT_TPS tokens/s"
           echo "Output throughput: $OUTPUT_TPS tokens/s"
