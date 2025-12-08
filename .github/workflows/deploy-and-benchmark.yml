@@ -197,12 +197,14 @@ jobs:
           echo "cost_out=$COST_OUT" >> $GITHUB_OUTPUT
 
       - name: Update pricing in docs
+        if: success()
         run: |
           python3 scripts/update_pricing.py \
             --results bench_results.json \
             --html docs/index.html
 
       - name: Commit and push pricing updates
+        if: success()
         run: |
           cd $GITHUB_WORKSPACE
           pwd
