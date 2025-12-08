@@ -1,6 +1,9 @@
-FROM nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04
+# ============================================
+# Stage 1: Builder - compile vLLM from source
+# ============================================
+FROM nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04 AS builder
 
-# Install essentials
+# Install build essentials
 RUN apt-get update && apt-get install -y \
     python3.12 python3.12-dev python3.12-venv python3-pip \
     git wget patch curl ca-certificates cmake build-essential ninja-build \
@@ -36,7 +39,7 @@ WORKDIR /app/vllm
 RUN python3 use_existing_torch.py
 RUN pip install -r requirements/build.txt
 
-# Set essential environment variables
+# Set essential environment variables for build
 ENV TORCH_CUDA_ARCH_LIST=12.0f
 ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
 ENV CUDA_HOME=/usr/local/cuda
@@ -44,11 +47,32 @@ ENV CUDA_HOME=/usr/local/cuda
 # Install vLLM with local build (source build for ARM64)
 RUN pip install --no-build-isolation -e . -v --pre
 
-# Clean up
-RUN rm -rf .git && rm -rf /root/.cache/pip && rm -rf /tmp/*
+# Clean up build artifacts
+RUN rm -rf /app/vllm/.git && rm -rf /root/.cache/pip && rm -rf /tmp/*
 
+# ============================================
+# Stage 2: Runtime - minimal production image
+# ============================================
+FROM nvidia/cuda:13.0.2-cudnn-runtime-ubuntu24.04 AS runtime
+
+# Install minimal runtime dependencies
+RUN apt-get update && apt-get install -y \
+    python3.12 python3.12-venv \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Copy vLLM source (needed for editable install)
+COPY --from=builder /app/vllm /app/vllm
+
+# Set environment
+ENV PATH="/opt/venv/bin:$PATH"
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
+
+# Working directory
+WORKDIR /app
 
 # Expose port
 EXPOSE 8000
