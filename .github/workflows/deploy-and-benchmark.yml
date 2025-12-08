@@ -20,7 +20,7 @@ env:
   VLLM_PORT: 8000
   MODEL: meta-llama/Llama-3.1-8B-Instruct
   # DGX Spark economics: $4000 hardware / 26280 hours (3yr) = $0.15/hr + ~$0.01/hr electricity = $0.16/hr
-  DGX_COST_PER_HOUR: "0.16"
+  DGX_COST_PER_HOUR: "0.06"
   DGX_TAILSCALE_IP: "100.64.38.13"
 
 jobs:
