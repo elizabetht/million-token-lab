@@ -3,14 +3,14 @@
   "dgx_cost_per_hour": 0.07,
   "image_tag": "ghcr.io/elizabetht/token-labs/vllm-serve:latest",
   "prefill": {
-    "tokens_per_second": 3211.89,
+    "tokens_per_second": 3203.14,
     "cost_per_million_tokens": 0.006
   },
   "decode": {
-    "tokens_per_second": 520.02,
+    "tokens_per_second": 520.13,
     "cost_per_million_tokens": 0.0373
   },
-  "timestamp": "2025-12-08T06:38:52.290185Z",
+  "timestamp": "2025-12-08T07:27:51.398498Z",
   "vllm_server_args": {
     "gpu_memory_utilization": 0.3
   },
