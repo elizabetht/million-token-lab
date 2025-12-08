@@ -81,6 +81,7 @@ jobs:
             --name ${{ env.CONTAINER_NAME }} \
             -p ${{ env.DGX_TAILSCALE_IP}}:${{ env.VLLM_PORT }}:8000 \
             -e HF_TOKEN=${{ secrets.HF_TOKEN }} \
+            -e FLASHINFER_DISABLE_VERSION_CHECK=1 \
             -v $HOME/.cache/huggingface:/root/.cache/huggingface \
             ${{ steps.vars.outputs.FULL_IMAGE }} \
             ${{ env.MODEL }} \
