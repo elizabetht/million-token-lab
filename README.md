@@ -45,7 +45,6 @@ DGX Spark running costs:
 │   ├── benchmark-results.html  # Detailed benchmark results
 │   └── benchmark-results.json  # Raw JSON data (auto-updated)
 ├── scripts/
-│   ├── bench_inference.py  # Benchmark script
 │   └── update_pricing.py   # Updates pricing in docs
 └── .github/workflows/
     ├── build-and-push.yml      # Build vLLM Docker image
