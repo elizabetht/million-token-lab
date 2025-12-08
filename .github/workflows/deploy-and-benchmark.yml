@@ -85,7 +85,6 @@ jobs:
             ${{ steps.vars.outputs.FULL_IMAGE }} \
             ${{ env.MODEL }} \
             --gpu-memory-utilization 0.3
-            --port 8000
 
       - name: Wait for vLLM server to be ready
         run: |
