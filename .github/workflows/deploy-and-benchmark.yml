@@ -124,53 +124,53 @@ jobs:
           python3 -m venv .venv
           source .venv/bin/activate
           pip install --upgrade pip
+          pip install vllm aiohttp
 
-      - name: Run vLLM latency benchmark
+      - name: Run vLLM serving benchmark
         id: benchmark
         run: |
-          # Run vllm bench latency inside the container
-          # This benchmarks the model directly without network overhead
-          echo "Running vLLM latency benchmark..."
+          source .venv/bin/activate
           
-          # Prefill benchmark (input-heavy): 1024 input tokens, 1 output token
-          echo "=== PREFILL BENCHMARK ===" 
-          docker exec ${{ env.CONTAINER_NAME }} vllm bench latency \
+          # Run vllm bench serve against the running server
+          echo "Running vLLM serving benchmark..."
+          
+          # Benchmark with mixed workload
+          echo "=== SERVING BENCHMARK ==="
+          vllm bench serve \
             --model ${{ env.MODEL }} \
-            --input-len 1024 \
-            --output-len 1 \
-            --batch-size 32 \
-            --num-iters 10 \
-            2>&1 | tee prefill_bench.txt
+            --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
+            --num-prompts 100 \
+            --request-rate 10 \
+            --random-input-len 512 \
+            --random-output-len 256 \
+            --save-result bench_serve_results.json \
+            2>&1 | tee serve_bench.txt
           
-          # Decode benchmark (output-heavy): 128 input tokens, 512 output tokens
-          echo "=== DECODE BENCHMARK ==="
-          docker exec ${{ env.CONTAINER_NAME }} vllm bench latency \
-            --model ${{ env.MODEL }} \
-            --input-len 128 \
-            --output-len 512 \
-            --batch-size 32 \
-            --num-iters 10 \
-            2>&1 | tee decode_bench.txt
+          # Extract metrics from results
+          # vllm bench serve outputs JSON with throughput metrics
+          if [ -f bench_serve_results.json ]; then
+            INPUT_TPS=$(python3 -c "import json; d=json.load(open('bench_serve_results.json')); print(d.get('input_throughput', 0))" 2>/dev/null || echo "0")
+            OUTPUT_TPS=$(python3 -c "import json; d=json.load(open('bench_serve_results.json')); print(d.get('output_throughput', 0))" 2>/dev/null || echo "0")
+          else
+            # Fallback: parse from text output
+            INPUT_TPS=$(grep -oP 'Input throughput:\s*\K[\d.]+' serve_bench.txt | tail -1 || echo "0")
+            OUTPUT_TPS=$(grep -oP 'Output throughput:\s*\K[\d.]+' serve_bench.txt | tail -1 || echo "0")
+          fi
           
-          # Extract throughput from benchmark output and calculate costs
-          # vllm bench latency outputs: "Throughput: X.XX tokens/s"
-          PREFILL_TPS=$(grep -oP 'Throughput:\s*\K[\d.]+' prefill_bench.txt | tail -1 || echo "0")
-          DECODE_TPS=$(grep -oP 'Throughput:\s*\K[\d.]+' decode_bench.txt | tail -1 || echo "0")
-          
-          echo "Prefill throughput: $PREFILL_TPS tokens/s"
-          echo "Decode throughput: $DECODE_TPS tokens/s"
+          echo "Input throughput: $INPUT_TPS tokens/s"
+          echo "Output throughput: $OUTPUT_TPS tokens/s"
           
           # Calculate cost per 1M tokens: (cost_per_hour / tokens_per_sec) * 1_000_000 / 3600
           DGX_COST=${{ env.DGX_COST_PER_HOUR }}
           
-          if [ "$PREFILL_TPS" != "0" ] && [ -n "$PREFILL_TPS" ]; then
-            COST_IN=$(echo "scale=4; $DGX_COST * 1000000 / ($PREFILL_TPS * 3600)" | bc)
+          if [ "$INPUT_TPS" != "0" ] && [ -n "$INPUT_TPS" ]; then
+            COST_IN=$(echo "scale=4; $DGX_COST * 1000000 / ($INPUT_TPS * 3600)" | bc)
           else
             COST_IN="0"
           fi
           
-          if [ "$DECODE_TPS" != "0" ] && [ -n "$DECODE_TPS" ]; then
-            COST_OUT=$(echo "scale=4; $DGX_COST * 1000000 / ($DECODE_TPS * 3600)" | bc)
+          if [ "$OUTPUT_TPS" != "0" ] && [ -n "$OUTPUT_TPS" ]; then
+            COST_OUT=$(echo "scale=4; $DGX_COST * 1000000 / ($OUTPUT_TPS * 3600)" | bc)
           else
             COST_OUT="0"
           fi
@@ -185,11 +185,11 @@ jobs:
             "dgx_cost_per_hour": $DGX_COST,
             "image_tag": "${{ steps.vars.outputs.FULL_IMAGE }}",
             "prefill": {
-              "tokens_per_second": ${PREFILL_TPS:-0},
+              "tokens_per_second": ${INPUT_TPS:-0},
               "cost_per_million_tokens": ${COST_IN:-0}
             },
             "decode": {
-              "tokens_per_second": ${DECODE_TPS:-0},
+              "tokens_per_second": ${OUTPUT_TPS:-0},
               "cost_per_million_tokens": ${COST_OUT:-0}
             }
           }
@@ -198,8 +198,8 @@ jobs:
           cat bench_results.json
           
           # Set outputs for summary
-          echo "prefill_tps=$PREFILL_TPS" >> $GITHUB_OUTPUT
-          echo "decode_tps=$DECODE_TPS" >> $GITHUB_OUTPUT
+          echo "prefill_tps=$INPUT_TPS" >> $GITHUB_OUTPUT
+          echo "decode_tps=$OUTPUT_TPS" >> $GITHUB_OUTPUT
           echo "cost_in=$COST_IN" >> $GITHUB_OUTPUT
           echo "cost_out=$COST_OUT" >> $GITHUB_OUTPUT
 
