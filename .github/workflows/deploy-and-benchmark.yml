@@ -122,23 +122,20 @@ jobs:
       - name: Run vLLM serving benchmark
         id: benchmark
         run: |
-          # Run vllm bench serve from a separate container against the running server
-          # This uses the same vllm installation from the Docker image
+          # Run vllm bench serve inside the running container using its venv
           echo "Running vLLM serving benchmark..."
           
-          # Benchmark with mixed workload
           echo "=== SERVING BENCHMARK ==="
-          docker run --rm \
-            --network host \
-            -e FLASHINFER_DISABLE_VERSION_CHECK=1 \
-            ${{ steps.vars.outputs.FULL_IMAGE }} \
+          docker exec ${{ env.CONTAINER_NAME }} \
+            bash -c "source /opt/venv/bin/activate && \
+            FLASHINFER_DISABLE_VERSION_CHECK=1 \
             vllm bench serve \
             --model ${{ env.MODEL }} \
             --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
             --num-prompts 100 \
             --request-rate 10 \
             --random-input-len 512 \
-            --random-output-len 256 \
+            --random-output-len 256" \
             2>&1 | tee serve_bench.txt
           
           cat serve_bench.txt
