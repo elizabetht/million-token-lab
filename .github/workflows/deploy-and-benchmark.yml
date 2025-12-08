@@ -94,7 +94,7 @@ jobs:
           ATTEMPT=0
           
           while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-            if curl -s http://localhost:${{ env.VLLM_PORT }}/health > /dev/null 2>&1; then
+            if curl -s http://${{ env.DGX_TAILSCALE_IP}}:${{ env.VLLM_PORT }}/health > /dev/null 2>&1; then
               echo "✅ vLLM server is ready!"
               exit 0
             fi
