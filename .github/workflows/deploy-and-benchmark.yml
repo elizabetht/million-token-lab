@@ -223,6 +223,7 @@ jobs:
           # Save results to JSON using Python for proper JSON formatting
           python3 -c "
           import json
+          from datetime import datetime
           
           data = {
               'model': '${{ env.MODEL }}',
@@ -235,7 +236,8 @@ jobs:
               'decode': {
                   'tokens_per_second': float('${OUTPUT_TPS}' or '0'),
                   'cost_per_million_tokens': float('${COST_OUT}' or '0')
-              }
+              },
+              'timestamp': datetime.utcnow().isoformat() + 'Z'
           }
           
           with open('bench_results.json', 'w') as f:
@@ -256,24 +258,28 @@ jobs:
           python3 scripts/update_pricing.py \
             --results bench_results.json \
             --html docs/index.html
+          
+          # Also copy results to docs for GitHub Pages
+          cp bench_results.json docs/benchmark-results.json
 
       - name: Commit and push pricing updates
         if: success()
         run: |
           cd $GITHUB_WORKSPACE
           pwd
-          ls -la
+          ls -la docs/
           git status
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
-          if git diff --quiet docs/index.html; then
+          # Check if there are any changes to commit
+          if git diff --quiet docs/index.html docs/benchmark-results.json 2>/dev/null; then
             echo "No pricing changes to commit"
           else
-            git add docs/index.html
-            git commit -m "Update pricing from benchmark results [skip ci]"
+            git add docs/index.html docs/benchmark-results.json
+            git commit -m "Update pricing and benchmark results [skip ci]"
             git push
-            echo "✅ Pricing updated and pushed"
+            echo "✅ Pricing and benchmark results updated and pushed"
           fi
 
       - name: Upload benchmark results
