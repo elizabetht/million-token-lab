@@ -39,18 +39,18 @@ data = {
         'prefill_test': {
             'num_prompts': 100,
             'request_rate': 10,
-            'input_len': 3072,
+            'input_len': 8192,
             'output_len': 1024,
-            'ratio': '3:1 input:output',
-            'total_tokens': 4096
+            'ratio': '8:1 input:output',
+            'total_tokens': 9216
         },
         'decode_test': {
             'num_prompts': 100,
             'request_rate': 10,
             'input_len': 1024,
-            'output_len': 3072,
-            'ratio': '1:3 input:output',
-            'total_tokens': 4096
+            'output_len': 8192,
+            'ratio': '1:8 input:output',
+            'total_tokens': 9216
         }
     },
     'hardware': {
