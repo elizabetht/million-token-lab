@@ -131,10 +131,11 @@ jobs:
           echo "Running vLLM serving benchmarks..."
           DGX_COST=${{ env.DGX_COST_PER_HOUR }}
           
+          echo "========================================"
           # === PREFILL-HEAVY BENCHMARK ===
           # 8:1 input:output ratio to measure prefill (input) performance
           # 8192 input + 1024 output = 9216 total tokens per request
-          echo "=== PREFILL-HEAVY BENCHMARK (8:1 input:output ratio) ==="
+          echo "=== PREFILL-HEAVY BENCHMARK (8:1 input:output ratio) ===="
           docker exec ${{ env.CONTAINER_NAME }} \
             bash -c "source /opt/venv/bin/activate && \
             FLASHINFER_DISABLE_VERSION_CHECK=1 \
@@ -161,11 +162,12 @@ jobs:
           CACHED_TPS=$(grep -oP 'Cached input throughput \(tok/s\):\s*\K[\d.]+' prefill_bench.txt | tail -1 || echo "0")
           echo "Cached input throughput: $CACHED_TPS tokens/s"
           
+          echo "========================================"
           # === DECODE-HEAVY BENCHMARK ===
           # 1:8 input:output ratio to measure decode (output) performance
           # 1024 input + 8192 output = 9216 total tokens per request
           echo ""
-          echo "=== DECODE-HEAVY BENCHMARK (1:8 input:output ratio) ==="
+          echo "=== DECODE-HEAVY BENCHMARK (1:8 input:output ratio) ===="
           docker exec ${{ env.CONTAINER_NAME }} \
             bash -c "source /opt/venv/bin/activate && \
             FLASHINFER_DISABLE_VERSION_CHECK=1 \
@@ -188,11 +190,12 @@ jobs:
           fi
           echo "Decode throughput: $DECODE_TPS tokens/s"
           
+          echo "========================================"
           # === PREFIX CACHE BENCHMARK ===
           # Uses prefix_repetition dataset to test LMCache effectiveness
           # 5 unique prefixes repeated across 100 prompts = high cache hit potential
           echo ""
-          echo "=== PREFIX CACHE BENCHMARK (LMCache test with repeated prefixes) ==="
+          echo "=== PREFIX CACHE BENCHMARK (LMCache test with repeated prefixes) ===="
           docker exec ${{ env.CONTAINER_NAME }} \
             bash -c "source /opt/venv/bin/activate && \
             FLASHINFER_DISABLE_VERSION_CHECK=1 \
@@ -230,6 +233,7 @@ jobs:
           INPUT_TPS=$PREFILL_TPS
           OUTPUT_TPS=$DECODE_TPS
           
+          echo "========================================"
           echo ""
           echo "=== FINAL RESULTS ==="
           echo "Input (prefill) throughput: $INPUT_TPS tokens/s"
