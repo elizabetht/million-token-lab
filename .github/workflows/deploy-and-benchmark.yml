@@ -264,22 +264,23 @@ jobs:
                   'cost_per_million_tokens': float('${COST_OUT}' or '0')
               },
               'timestamp': datetime.utcnow().isoformat() + 'Z',
-                'vllm_server_args': {
+              'vllm_server_args': {
                   'gpu_memory_utilization': 0.3,
                   'max_model_len': 131072,
                   'kv_transfer_config': {
-                    'kv_connector': 'LMCacheConnectorV1',
-                    'kv_role': 'kv_both'
+                      'kv_connector': 'LMCacheConnectorV1',
+                      'kv_role': 'kv_both'
                   },
                   'prefix_caching': False
-                },
-                'lmcache_config': {
+              },
+              'lmcache_config': {
                   'enabled': True,
                   'chunk_size': 8,
                   'local_cpu': True,
                   'max_local_cpu_size': 5.0
-                },
-                'benchmark_args': {
+              },
+              'benchmark_args': {
+                  'prefill_test': {
                       'num_prompts': 100,
                       'request_rate': 10,
                       'input_len': 3072,
