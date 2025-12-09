@@ -112,29 +112,16 @@ jobs:
           while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
             if curl -s http://${{ env.DGX_TAILSCALE_IP}}:${{ env.VLLM_PORT }}/health > /dev/null 2>&1; then
               echo "✅ vLLM server is ready!"
-              run: |
-                echo "Starting vLLM server with model: ${{ env.MODEL }} (LMCache enabled)"
-                docker run -d \
-                  --gpus all \
-                  --name ${{ env.CONTAINER_NAME }} \
-                  -p ${{ env.DGX_TAILSCALE_IP}}:${{ env.VLLM_PORT }}:8000 \
-                  -e HF_TOKEN=${{ secrets.HF_TOKEN }} \
-                  -e FLASHINFER_DISABLE_VERSION_CHECK=1 \
-                  -e LMCACHE_CONFIG_FILE=/app/config/lmcache-cpu-offload.yaml \
-                  -e LMCACHE_USE_EXPERIMENTAL=True \
-                  -v $HOME/.cache/huggingface:/root/.cache/huggingface \
-                  -v ${{ github.workspace }}/config:/app/config:ro \
-                  ${{ steps.vars.outputs.FULL_IMAGE }} \
-                  ${{ env.MODEL }} \
-                  --port 8000 \
-                  --kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}' \
-                  --download-dir /root/.cache/huggingface/hub \
-                  --no-enable-prefix-caching \
-                  --gpu-memory-utilization 0.3 \
-                  --max-model-len 131072
-          echo "❌ Server failed to start within timeout"
-          docker logs ${{ env.CONTAINER_NAME }} --tail 100
-          exit 1
+              break
+            fi
+            ATTEMPT=$((ATTEMPT+1))
+            sleep 1
+          done
+          if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+            echo "❌ Server failed to start within timeout"
+            docker logs ${{ env.CONTAINER_NAME }} --tail 100
+            exit 1
+          fi
 
       - name: Run vLLM serving benchmark
         id: benchmark
