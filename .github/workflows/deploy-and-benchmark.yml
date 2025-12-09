@@ -101,7 +101,9 @@ jobs:
             -v ${{ github.workspace }}/config:/app/config:ro \
             ${{ steps.vars.outputs.FULL_IMAGE }} \
             ${{ env.MODEL }} \
+            --kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}' \
             --gpu-memory-utilization 0.3
+            --no-enable-prefix-caching
 
       - name: Wait for vLLM server to be ready
         run: |
@@ -185,6 +187,44 @@ jobs:
             DECODE_TPS=$(grep -oP 'Total Token throughput \(tok/s\):\s*\K[\d.]+' decode_bench.txt | tail -1 || echo "0")
           fi
           echo "Decode throughput: $DECODE_TPS tokens/s"
+          
+          # === PREFIX CACHE BENCHMARK ===
+          # Uses prefix_repetition dataset to test LMCache effectiveness
+          # 5 unique prefixes repeated across 100 prompts = high cache hit potential
+          echo ""
+          echo "=== PREFIX CACHE BENCHMARK (LMCache test with repeated prefixes) ==="
+          docker exec ${{ env.CONTAINER_NAME }} \
+            bash -c "source /opt/venv/bin/activate && \
+            FLASHINFER_DISABLE_VERSION_CHECK=1 \
+            vllm bench serve \
+            --model ${{ env.MODEL }} \
+            --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
+            --dataset-name prefix_repetition \
+            --num-prompts 100 \
+            --prefix-repetition-prefix-len 512 \
+            --prefix-repetition-suffix-len 128 \
+            --prefix-repetition-num-prefixes 5 \
+            --prefix-repetition-output-len 128" \
+            2>&1 | tee cache_bench.txt
+          
+          cat cache_bench.txt
+          
+          # Extract cached throughput from prefix_repetition benchmark
+          CACHE_TEST_TPS=$(grep -oP 'Cached input throughput \(tok/s\):\s*\K[\d.]+' cache_bench.txt | tail -1 || echo "0")
+          if [ "$CACHE_TEST_TPS" = "0" ] || [ -z "$CACHE_TEST_TPS" ]; then
+            # Fallback to input throughput
+            CACHE_TEST_TPS=$(grep -oP 'Input throughput \(tok/s\):\s*\K[\d.]+' cache_bench.txt | tail -1 || echo "0")
+          fi
+          echo "Cache test throughput: $CACHE_TEST_TPS tokens/s"
+          
+          # Extract prefix cache hit rate if available
+          CACHE_HIT_RATE=$(grep -oP 'Prefix cache hit rate:\s*\K[\d.]+' cache_bench.txt | tail -1 || echo "0")
+          echo "Prefix cache hit rate: $CACHE_HIT_RATE%"
+          
+          # Use the cache benchmark result for CACHED_TPS if it's better
+          if [ "$CACHE_TEST_TPS" != "0" ] && [ -n "$CACHE_TEST_TPS" ]; then
+            CACHED_TPS=$CACHE_TEST_TPS
+          fi
           
           # Use extracted values
           INPUT_TPS=$PREFILL_TPS

@@ -51,6 +51,15 @@ data = {
             'output_len': 8192,
             'ratio': '1:8 input:output',
             'total_tokens': 9216
+        },
+        'cache_test': {
+            'dataset': 'prefix_repetition',
+            'num_prompts': 100,
+            'prefix_len': 512,
+            'suffix_len': 128,
+            'num_prefixes': 5,
+            'output_len': 128,
+            'description': 'Tests LMCache with repeated prefixes'
         }
     },
     'hardware': {
