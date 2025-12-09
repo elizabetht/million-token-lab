@@ -40,6 +40,7 @@ RUN pip install -r requirements/build.txt
 ENV TORCH_CUDA_ARCH_LIST=12.0f
 ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
 ENV CUDA_HOME=/usr/local/cuda
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 
 # Install vLLM with local build (source build for ARM64)
 RUN pip install --no-build-isolation -e . -v --pre
