@@ -285,7 +285,8 @@
             const lastUpdated = document.getElementById('last-updated');
             
             try {
-                const response = await fetch('benchmark-results.json');
+                // Add cache-busting to prevent stale data
+                const response = await fetch('benchmark-results.json?t=' + Date.now());
                 if (!response.ok) throw new Error('Failed to load results');
                 
                 const data = await response.json();
@@ -520,7 +521,7 @@
             const historySection = document.getElementById('history-section');
             
             try {
-                const response = await fetch('benchmark-history.json');
+                const response = await fetch('benchmark-history.json?t=' + Date.now());
                 if (!response.ok) throw new Error('No history available');
                 
                 const history = await response.json();
