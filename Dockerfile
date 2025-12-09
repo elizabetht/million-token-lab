@@ -1,9 +1,6 @@
-# ============================================
-# Stage 1: Builder - compile vLLM from source
-# ============================================
-FROM nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04 AS builder
+FROM nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04
 
-# Install build essentials
+# Install build essentials and runtime dependencies
 RUN apt-get update && apt-get install -y \
     python3.12 python3.12-dev python3.12-venv python3-pip \
     git wget patch curl ca-certificates cmake build-essential ninja-build \
@@ -49,22 +46,6 @@ RUN pip install --no-build-isolation -e . -v --pre
 
 # Clean up build artifacts
 RUN rm -rf /app/vllm/.git && rm -rf /root/.cache/pip && rm -rf /tmp/*
-
-# ============================================
-# Stage 2: Runtime - minimal production image
-# ============================================
-FROM nvidia/cuda:13.0.2-cudnn-runtime-ubuntu24.04 AS runtime
-
-# Install minimal runtime dependencies
-RUN apt-get update && apt-get install -y \
-    python3.12 python3.12-venv build-essential\
-    && rm -rf /var/lib/apt/lists/*
-
-# Copy virtual environment from builder
-COPY --from=builder /opt/venv /opt/venv
-
-# Copy vLLM source (needed for editable install)
-COPY --from=builder /app/vllm /app/vllm
 
 # Set environment
 ENV PATH="/opt/venv/bin:$PATH"
