@@ -94,17 +94,11 @@ jobs:
             --name ${{ env.CONTAINER_NAME }} \
             -p ${{ env.DGX_TAILSCALE_IP}}:${{ env.VLLM_PORT }}:8000 \
             -e HF_TOKEN=${{ secrets.HF_TOKEN }} \
-            -e LMCACHE_LOG_LEVEL=WARNING \
             -e FLASHINFER_DISABLE_VERSION_CHECK=1 \
-            -e LMCACHE_CONFIG_FILE=/app/config/lmcache-cpu-offload.yaml \
-            -e LMCACHE_USE_EXPERIMENTAL=True \
             -v $HOME/.cache/huggingface:/root/.cache/huggingface \
-            -v ${{ github.workspace }}/config:/app/config:ro \
             ${{ steps.vars.outputs.FULL_IMAGE }} \
             ${{ env.MODEL }} \
-            --kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}' \
-            --gpu-memory-utilization 0.3 \
-            --no-enable-prefix-caching
+            --gpu-memory-utilization 0.3 
 
       - name: Wait for vLLM server to be ready
         run: |
