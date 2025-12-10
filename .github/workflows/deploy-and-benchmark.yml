@@ -102,7 +102,7 @@ jobs:
             ${{ steps.vars.outputs.FULL_IMAGE }} \
             ${{ env.MODEL }} \
             --kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}' \
-            --gpu-memory-utilization 0.3
+            --gpu-memory-utilization 0.3 \
             --no-enable-prefix-caching
 
       - name: Wait for vLLM server to be ready
