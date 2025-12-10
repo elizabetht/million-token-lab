@@ -56,19 +56,19 @@ jobs:
           DOCKER_BUILD_SUMMARY: false
           DOCKER_BUILD_RECORD_UPLOAD: false
 
-      - name: Retry push on failure
-        if: failure() && steps.build.outcome == 'failure'
-        uses: docker/build-push-action@v6
-        with:
-          context: .
-          platforms: linux/arm64
-          push: true
-          provenance: false
-          tags: |
-            ${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.VERSION }}
-            ${{ steps.vars.outputs.IMAGE }}:latest
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-        env:
-          DOCKER_BUILD_SUMMARY: false
-          DOCKER_BUILD_RECORD_UPLOAD: false
+      # - name: Retry push on failure
+      #   if: failure() && steps.build.outcome == 'failure'
+      #   uses: docker/build-push-action@v6
+      #   with:
+      #     context: .
+      #     platforms: linux/arm64
+      #     push: true
+      #     provenance: false
+      #     tags: |
+      #       ${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.VERSION }}
+      #       ${{ steps.vars.outputs.IMAGE }}:latest
+      #     cache-from: type=gha
+      #     cache-to: type=gha,mode=max
+      #   env:
+      #     DOCKER_BUILD_SUMMARY: false
+      #     DOCKER_BUILD_RECORD_UPLOAD: false
