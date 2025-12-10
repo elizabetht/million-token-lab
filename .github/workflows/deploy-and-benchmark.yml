@@ -131,60 +131,60 @@ jobs:
           echo "Running vLLM serving benchmarks..."
           DGX_COST=${{ env.DGX_COST_PER_HOUR }}
           
-          echo "========================================"
-          # === PREFILL-HEAVY BENCHMARK ===
-          # 8:1 input:output ratio to measure prefill (input) performance
-          # 8192 input + 1024 output = 9216 total tokens per request
-          echo "=== PREFILL-HEAVY BENCHMARK (8:1 input:output ratio) ===="
-          docker exec ${{ env.CONTAINER_NAME }} \
-            bash -c "source /opt/venv/bin/activate && \
-            FLASHINFER_DISABLE_VERSION_CHECK=1 \
-            vllm bench serve \
-            --model ${{ env.MODEL }} \
-            --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
-            --num-prompts 100 \
-            --request-rate 10 \
-            --random-input-len 8192 \
-            --random-output-len 1024" \
-            2>&1 | tee prefill_bench.txt
+          # echo "========================================"
+          # # === PREFILL-HEAVY BENCHMARK ===
+          # # 8:1 input:output ratio to measure prefill (input) performance
+          # # 8192 input + 1024 output = 9216 total tokens per request
+          # echo "=== PREFILL-HEAVY BENCHMARK (8:1 input:output ratio) ===="
+          # docker exec ${{ env.CONTAINER_NAME }} \
+          #   bash -c "source /opt/venv/bin/activate && \
+          #   FLASHINFER_DISABLE_VERSION_CHECK=1 \
+          #   vllm bench serve \
+          #   --model ${{ env.MODEL }} \
+          #   --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
+          #   --num-prompts 100 \
+          #   --request-rate 10 \
+          #   --random-input-len 8192 \
+          #   --random-output-len 1024" \
+          #   2>&1 | tee prefill_bench.txt
           
-          cat prefill_bench.txt
+          # cat prefill_bench.txt
           
-          # Extract prefill throughput (input tokens/s)
-          PREFILL_TPS=$(grep -oP 'Input throughput \(tok/s\):\s*\K[\d.]+' prefill_bench.txt | tail -1 || echo "0")
-          if [ "$PREFILL_TPS" = "0" ] || [ -z "$PREFILL_TPS" ]; then
-            # Fallback to total throughput if input not found
-            PREFILL_TPS=$(grep -oP 'Total Token throughput \(tok/s\):\s*\K[\d.]+' prefill_bench.txt | tail -1 || echo "0")
-          fi
-          echo "Prefill throughput: $PREFILL_TPS tokens/s"
+          # # Extract prefill throughput (input tokens/s)
+          # PREFILL_TPS=$(grep -oP 'Input throughput \(tok/s\):\s*\K[\d.]+' prefill_bench.txt | tail -1 || echo "0")
+          # if [ "$PREFILL_TPS" = "0" ] || [ -z "$PREFILL_TPS" ]; then
+          #   # Fallback to total throughput if input not found
+          #   PREFILL_TPS=$(grep -oP 'Total Token throughput \(tok/s\):\s*\K[\d.]+' prefill_bench.txt | tail -1 || echo "0")
+          # fi
+          # echo "Prefill throughput: $PREFILL_TPS tokens/s"
           
-          echo "========================================"
-          # === DECODE-HEAVY BENCHMARK ===
-          # 1:8 input:output ratio to measure decode (output) performance
-          # 1024 input + 8192 output = 9216 total tokens per request
-          echo ""
-          echo "=== DECODE-HEAVY BENCHMARK (1:8 input:output ratio) ===="
-          docker exec ${{ env.CONTAINER_NAME }} \
-            bash -c "source /opt/venv/bin/activate && \
-            FLASHINFER_DISABLE_VERSION_CHECK=1 \
-            vllm bench serve \
-            --model ${{ env.MODEL }} \
-            --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
-            --num-prompts 100 \
-            --request-rate 10 \
-            --random-input-len 1024 \
-            --random-output-len 8192" \
-            2>&1 | tee decode_bench.txt
+          # echo "========================================"
+          # # === DECODE-HEAVY BENCHMARK ===
+          # # 1:8 input:output ratio to measure decode (output) performance
+          # # 1024 input + 8192 output = 9216 total tokens per request
+          # echo ""
+          # echo "=== DECODE-HEAVY BENCHMARK (1:8 input:output ratio) ===="
+          # docker exec ${{ env.CONTAINER_NAME }} \
+          #   bash -c "source /opt/venv/bin/activate && \
+          #   FLASHINFER_DISABLE_VERSION_CHECK=1 \
+          #   vllm bench serve \
+          #   --model ${{ env.MODEL }} \
+          #   --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
+          #   --num-prompts 100 \
+          #   --request-rate 10 \
+          #   --random-input-len 1024 \
+          #   --random-output-len 8192" \
+          #   2>&1 | tee decode_bench.txt
           
-          cat decode_bench.txt
+          # cat decode_bench.txt
           
-          # Extract decode throughput (output tokens/s)
-          DECODE_TPS=$(grep -oP 'Output throughput \(tok/s\):\s*\K[\d.]+' decode_bench.txt | tail -1 || echo "0")
-          if [ "$DECODE_TPS" = "0" ] || [ -z "$DECODE_TPS" ]; then
-            # Fallback to total throughput if output not found
-            DECODE_TPS=$(grep -oP 'Total Token throughput \(tok/s\):\s*\K[\d.]+' decode_bench.txt | tail -1 || echo "0")
-          fi
-          echo "Decode throughput: $DECODE_TPS tokens/s"
+          # # Extract decode throughput (output tokens/s)
+          # DECODE_TPS=$(grep -oP 'Output throughput \(tok/s\):\s*\K[\d.]+' decode_bench.txt | tail -1 || echo "0")
+          # if [ "$DECODE_TPS" = "0" ] || [ -z "$DECODE_TPS" ]; then
+          #   # Fallback to total throughput if output not found
+          #   DECODE_TPS=$(grep -oP 'Total Token throughput \(tok/s\):\s*\K[\d.]+' decode_bench.txt | tail -1 || echo "0")
+          # fi
+          # echo "Decode throughput: $DECODE_TPS tokens/s"
           
           echo "========================================"
           # === PREFIX CACHE BENCHMARK ===
