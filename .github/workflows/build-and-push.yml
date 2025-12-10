@@ -52,6 +52,10 @@ jobs:
           tags: |
             ${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.VERSION }}
             ${{ steps.vars.outputs.IMAGE }}:latest
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            BUILDKIT_INLINE_CACHE=1
         env:
           DOCKER_BUILD_SUMMARY: false
           DOCKER_BUILD_RECORD_UPLOAD: false
