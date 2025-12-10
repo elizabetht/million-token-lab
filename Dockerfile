@@ -37,14 +37,16 @@ WORKDIR /app/vllm
 RUN python3 use_existing_torch.py
 RUN pip install -r requirements/build.txt
 
-# Install LMCache from source
-WORKDIR /app
+# Install vLLM with local build (source build for ARM64)
+RUN pip install --no-build-isolation -e . -v --pre
+
 RUN git clone https://github.com/LMCache/LMCache.git
 WORKDIR /app/LMCache
 RUN pip install -r requirements/build.txt
+RUN pip install -e . --no-build-isolation
 
-# Go back to vLLM directory
-WORKDIR /app/vllm
+# Clean up build artifacts
+RUN rm -rf /app/vllm/.git && rm -rf /root/.cache/pip && rm -rf /tmp/* && rm -rf /app/LMCache/.git
 
 # Set essential environment variables for build
 ENV TORCH_CUDA_ARCH_LIST=12.0f
@@ -53,15 +55,6 @@ ENV CUDA_HOME=/usr/local/cuda
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 
 RUN apt install -y python3-dev
-
-# Install vLLM with local build (source build for ARM64)
-RUN pip install --no-build-isolation -e . -v --pre
-
-WORKDIR /app/LMCache
-RUN pip install -e . --no-build-isolation -v --pre
-
-# Clean up build artifacts
-RUN rm -rf /app/vllm/.git && rm -rf /root/.cache/pip && rm -rf /tmp/*
 
 # Set environment
 ENV PATH="/opt/venv/bin:$PATH"
