@@ -144,7 +144,7 @@ jobs:
             --model ${{ env.MODEL }} \
             --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
             --dataset-name prefix_repetition \
-            --num-prompts 10 \
+            --num-prompts 100 \
             --prefix-repetition-prefix-len 512 \
             --prefix-repetition-suffix-len 128 \
             --prefix-repetition-num-prefixes 5 \
@@ -152,6 +152,31 @@ jobs:
             2>&1 | tee cache_bench.txt
           
           echo "✅ PREFIX CACHE benchmark completed!"
+          
+          # === EXTRACT SERVER METRICS IMMEDIATELY AFTER CACHE BENCHMARK ===
+          echo ""
+          echo "========================================"
+          echo "EXTRACTING SERVER METRICS FOR CACHED THROUGHPUT CALCULATION"
+          echo "(Extracting while cache is populated and metrics are fresh)"
+          echo "========================================"
+          
+          # Get recent server logs to extract vLLM server metrics
+          docker logs ${{ env.CONTAINER_NAME }} --tail 500 > server_logs.txt
+          
+          # Extract avg prompt throughput from vLLM server logs (filter for non-zero values)
+          # Pattern: "Engine 000: Avg prompt throughput: 921.5 tokens/s" (exclude 0.0 values)
+          SERVER_PROMPT_TPS=$(grep -oP 'Avg prompt throughput: \K[\d.]+(?= tokens/s)' server_logs.txt | \
+                              grep -v '^0\.0*$' | tail -1 || echo "0")
+          
+          # Extract external prefix cache hit rate from vLLM server logs 
+          # Pattern: "External prefix cache hit rate: 10.9%" 
+          SERVER_CACHE_HIT_RATE=$(grep -oP 'External prefix cache hit rate: \K[\d.]+(?=%)' server_logs.txt | tail -1 || echo "0")
+          
+          echo "Extracted server metrics (non-zero prompt throughput only):"
+          echo "- Raw prompt throughput values found: $(grep -oP 'Avg prompt throughput: \K[\d.]+(?= tokens/s)' server_logs.txt | tr '\n' ' ')"
+          echo "- Non-zero prompt throughput selected: $SERVER_PROMPT_TPS tokens/s"
+          echo "- External cache hit rate: $SERVER_CACHE_HIT_RATE%"
+          
           echo ""
           echo "========================================"
           echo "Now running PREFILL and DECODE benchmarks in parallel..."
@@ -167,7 +192,7 @@ jobs:
             vllm bench serve \
             --model ${{ env.MODEL }} \
             --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
-            --num-prompts 10 \
+            --num-prompts 100 \
             --request-rate 10 \
             --random-input-len 3072 \
             --random-output-len 1024" \
@@ -182,7 +207,7 @@ jobs:
             vllm bench serve \
             --model ${{ env.MODEL }} \
             --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
-            --num-prompts 10 \
+            --num-prompts 100 \
             --request-rate 10 \
             --random-input-len 1024 \
             --random-output-len 3072" \
@@ -254,38 +279,22 @@ jobs:
           # Cached input throughput = Avg prompt throughput × Prefix cache hit rate
           echo "========================================"
           echo ""
-          echo "=== EXTRACTING SERVER METRICS FOR CACHED THROUGHPUT CALCULATION ==="
+          echo "=== CALCULATING CACHED THROUGHPUT FROM EXTRACTED SERVER METRICS ==="
           
-          # Get recent server logs to extract vLLM server metrics
-          docker logs ${{ env.CONTAINER_NAME }} --tail 500 > server_logs.txt
-          
-          # Extract avg prompt throughput from vLLM server logs (filter for non-zero values)
-          # Pattern: "Engine 000: Avg prompt throughput: 921.5 tokens/s" (exclude 0.0 values)
-          SERVER_PROMPT_TPS=$(grep -oP 'Avg prompt throughput: \K[\d.]+(?= tokens/s)' server_logs.txt | \
-                              grep -v '^0\.0*$' | tail -1 || echo "0")
-          
-          # Extract external prefix cache hit rate from vLLM server logs 
-          # Pattern: "External prefix cache hit rate: 10.9%" 
-          SERVER_CACHE_HIT_RATE=$(grep -oP 'External prefix cache hit rate: \K[\d.]+(?=%)' server_logs.txt | tail -1 || echo "0")
-          
-          echo "Extracted server metrics (non-zero prompt throughput only):"
-          echo "- Raw prompt throughput values found: $(grep -oP 'Avg prompt throughput: \K[\d.]+(?= tokens/s)' server_logs.txt | tr '\n' ' ')"
-          echo "- Non-zero prompt throughput selected: $SERVER_PROMPT_TPS tokens/s"
-          echo "- External cache hit rate: $SERVER_CACHE_HIT_RATE%"
+          # Use the server metrics extracted after cache benchmark
+          echo "Using previously extracted server metrics:"
+          echo "- Server prompt throughput: $SERVER_PROMPT_TPS tokens/s"
+          echo "- Server cache hit rate: $SERVER_CACHE_HIT_RATE%"
           
           # Fallback to benchmark values if server metrics not found
           if [ "$SERVER_PROMPT_TPS" = "0" ] || [ -z "$SERVER_PROMPT_TPS" ]; then
             SERVER_PROMPT_TPS=$PREFILL_TPS
-            echo "Using benchmark prompt throughput (server metric not found): $SERVER_PROMPT_TPS tokens/s"
-          else
-            echo "Server avg prompt throughput: $SERVER_PROMPT_TPS tokens/s"
+            echo "Fallback: Using benchmark prompt throughput: $SERVER_PROMPT_TPS tokens/s"
           fi
           
           if [ "$SERVER_CACHE_HIT_RATE" = "0" ] || [ -z "$SERVER_CACHE_HIT_RATE" ]; then
             SERVER_CACHE_HIT_RATE="$CACHE_HIT_RATE"
-            echo "Using benchmark cache hit rate (server metric not found): $SERVER_CACHE_HIT_RATE%"
-          else
-            echo "Server external prefix cache hit rate: $SERVER_CACHE_HIT_RATE%"
+            echo "Fallback: Using benchmark cache hit rate: $SERVER_CACHE_HIT_RATE%"
           fi
           
           # Calculate cached input throughput using the formula:
@@ -377,15 +386,15 @@ jobs:
           export COST_CACHED="${COST_CACHED}"
           
           # Benchmark parameters for dynamic HTML generation
-          export PREFILL_NUM_PROMPTS="10"
+          export PREFILL_NUM_PROMPTS="100"
           export PREFILL_REQUEST_RATE="10"
           export PREFILL_INPUT_LEN="3072"
           export PREFILL_OUTPUT_LEN="1024"
-          export DECODE_NUM_PROMPTS="10"
+          export DECODE_NUM_PROMPTS="100"
           export DECODE_REQUEST_RATE="10"
           export DECODE_INPUT_LEN="1024"
           export DECODE_OUTPUT_LEN="3072"
-          export CACHE_NUM_PROMPTS="10"
+          export CACHE_NUM_PROMPTS="100"
           export CACHE_PREFIX_LEN="512"
           export CACHE_SUFFIX_LEN="128"
           export CACHE_NUM_PREFIXES="5"
