@@ -101,10 +101,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Pin to a specific commit for reproducibility and caching
 ARG LMCACHE_COMMIT=main
 RUN --mount=type=cache,target=/root/.cache/git \
-    git clone https://github.com/LMCache/LMCache.git
+    git clone https://github.com/LMCache/LMCache.git && \
+    cd /app/LMCache && \
+    git checkout ${LMCACHE_COMMIT}
 
 WORKDIR /app/LMCache
-RUN git checkout ${LMCACHE_COMMIT}
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -r requirements/build.txt
 
