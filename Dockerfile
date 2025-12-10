@@ -1,7 +1,27 @@
-FROM nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04
+# syntax=docker/dockerfile:1.4
+# Enable BuildKit for advanced caching features
+
+# ============================================================================
+# Build Stage: Compile vLLM and dependencies
+# ============================================================================
+FROM nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04 AS builder
+
+# Set essential environment variables for build
+# These are needed during compilation and should be set early
+# CUDA_ARCH can be overridden for different GPU architectures
+# Default 12.0f is used for vLLM on Grace Hopper (H100 GPU)
+# Note: The 'f' suffix is vLLM-specific notation (not standard CUDA compute capability)
+ARG CUDA_ARCH=12.0f
+ENV TORCH_CUDA_ARCH_LIST=${CUDA_ARCH}
+ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
+ENV CUDA_HOME=/usr/local/cuda
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 
 # Install build essentials and runtime dependencies
-RUN apt-get update && apt-get install -y \
+# Using cache mount for apt to speed up repeated builds
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y \
     python3.12 python3.12-dev python3.12-venv python3-pip \
     git wget patch curl ca-certificates cmake build-essential ninja-build \
     gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
@@ -15,13 +35,19 @@ RUN python3.12 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
 
 # Upgrade pip (use explicit path to ensure venv pip is used)
-RUN /opt/venv/bin/pip install --upgrade pip
+# Using cache mount for pip to reuse downloaded packages
+RUN --mount=type=cache,target=/root/.cache/pip \
+    /opt/venv/bin/pip install --upgrade pip
 
 # Install PyTorch + CUDA
-RUN pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
+# This is a large dependency and rarely changes, so it's cached separately
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
 
 # Install pre-release deps
-RUN pip install xgrammar triton
+# These are smaller and can be cached together
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install xgrammar triton
 
 # Set essential environment variables for build BEFORE building packages
 ENV TORCH_CUDA_ARCH_LIST="8.9;9.0;12.1"
@@ -33,40 +59,89 @@ ENV MAX_JOBS=4
 ENV TORCH_USE_CUDA_DSA=0
 
 # Install flashinfer for ARM64/CUDA 13.0
-RUN pip install -U --pre flashinfer-python --index-url https://flashinfer.ai/whl/nightly --no-deps
-RUN pip install flashinfer-python
-RUN pip install -U --pre flashinfer-cubin --index-url https://flashinfer.ai/whl/nightly
-RUN pip install -U --pre flashinfer-jit-cache --index-url https://flashinfer.ai/whl/cu130
+# Separate RUN commands for better debugging and cache granularity
+# First install without deps to avoid conflicts, then install with deps
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -U --pre flashinfer-python --index-url https://flashinfer.ai/whl/nightly --no-deps
 
-# Clone vLLM
-RUN git clone https://github.com/vllm-project/vllm.git
+# Install with dependencies to ensure all requirements are met
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install flashinfer-python
+
+# Install additional flashinfer components
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -U --pre flashinfer-cubin --index-url https://flashinfer.ai/whl/nightly
+
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -U --pre flashinfer-jit-cache --index-url https://flashinfer.ai/whl/cu130
+
+# Clone vLLM at a specific commit for cache stability
+# Using a recent stable commit - update this SHA when you want to rebuild
+ARG VLLM_COMMIT=main
+RUN --mount=type=cache,target=/root/.cache/git \
+    git clone https://github.com/vllm-project/vllm.git && \
+    cd vllm && \
+    git checkout ${VLLM_COMMIT}
 
 WORKDIR /app/vllm
 
 # Install build requirements for vLLM
+# Cache pip downloads to speed up repeated builds
 RUN python3 use_existing_torch.py
-RUN pip install -r requirements/build.txt
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements/build.txt
 
 # Install vLLM with local build (source build for ARM64)
-RUN pip install --no-build-isolation -e . -v --pre
+# This is the most time-consuming step; cache mount helps with partial rebuilds
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=cache,target=/app/vllm/build \
+    pip install --no-build-isolation -e . -v --pre
 
-RUN git clone https://github.com/LMCache/LMCache.git
-WORKDIR /app/vllm/LMCache
-RUN pip install -r requirements/build.txt
+# Clone and install LMCache
+# Pin to a specific commit for reproducibility and caching
+ARG LMCACHE_COMMIT=main
+RUN --mount=type=cache,target=/root/.cache/git \
+    git clone https://github.com/LMCache/LMCache.git && \
+    cd /app/LMCache && \
+    git checkout ${LMCACHE_COMMIT}
 
-# Set additional environment variables specifically for LMCache build
-ENV NVCC_APPEND_FLAGS="-gencode arch=compute_121,code=sm_121"
+WORKDIR /app/LMCache
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install -r requirements/build.txt
 
-# Try installation without build isolation first, if it fails try with build isolation
-RUN pip install -e . --no-build-isolation || pip install -e .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=cache,target=/app/LMCache/build \
+    pip install -e . --no-build-isolation
 
-# Clean up build artifacts
-RUN rm -rf /app/vllm/.git && rm -rf /root/.cache/pip && rm -rf /tmp/* && rm -rf /app/LMCache/.git
+# ============================================================================
+# Runtime Stage: Minimal image with only necessary components
+# ============================================================================
+FROM nvidia/cuda:13.0.2-cudnn-runtime-ubuntu24.04 AS runtime
 
-RUN apt install -y python3-dev
+# Install only runtime dependencies (no build tools needed)
+# python3-dev is included for potential JIT compilation needs
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
+    apt-get update && apt-get install -y \
+    python3.12 python3.12-dev python3.12-venv
 
-# Set environment
+# Copy the virtual environment from builder
+COPY --from=builder /opt/venv /opt/venv
+
+# Copy vLLM installation
+COPY --from=builder /app/vllm /app/vllm
+
+# Copy LMCache installation
+COPY --from=builder /app/LMCache /app/LMCache
+
+# Set environment variables
+# Use same CUDA_ARCH from builder stage
+ARG CUDA_ARCH=12.0f
 ENV PATH="/opt/venv/bin:$PATH"
+ENV TORCH_CUDA_ARCH_LIST=${CUDA_ARCH}
+ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
+ENV CUDA_HOME=/usr/local/cuda
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
@@ -76,4 +151,5 @@ WORKDIR /app
 # Expose port
 EXPOSE 8000
 
+# Default entrypoint
 ENTRYPOINT ["vllm", "serve"]
