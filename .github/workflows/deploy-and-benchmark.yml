@@ -226,20 +226,27 @@ jobs:
           echo ""
           echo "=== EXTRACTING SERVER METRICS FOR CACHED THROUGHPUT CALCULATION ==="
           
-          # Get recent server logs to extract prompt throughput and cache hit rate
+          # Get recent server logs to extract cache hit information
           docker logs ${{ env.CONTAINER_NAME }} --tail 200 > server_logs.txt
           
-          # Extract avg prompt throughput from server logs (tokens/s)
-          SERVER_PROMPT_TPS=$(grep -oP 'Avg prompt throughput.*?(\d+\.?\d*)\s*tokens?/s' server_logs.txt | grep -oP '\d+\.?\d*' | tail -1 || echo "0")
-          if [ "$SERVER_PROMPT_TPS" = "0" ] || [ -z "$SERVER_PROMPT_TPS" ]; then
-            # Fallback: use the prefill throughput from benchmark
-            SERVER_PROMPT_TPS=$PREFILL_TPS
-          fi
-          echo "Server avg prompt throughput: $SERVER_PROMPT_TPS tokens/s"
+          # Calculate cache hit rate from LMCache logs
+          # Count cache hits vs total requests from LMCache logs
+          TOTAL_REQUESTS=$(grep -c "LMCache hit tokens:" server_logs.txt || echo "0")
+          CACHE_HITS=$(grep "LMCache hit tokens:" server_logs.txt | grep -v "LMCache hit tokens: 0" | wc -l || echo "0")
           
-          # Extract server cache hit rate (may be different from benchmark)
-          SERVER_CACHE_HIT_RATE=$(grep -oP 'Prefix cache hit rate.*?(\d+\.?\d*)%?' server_logs.txt | grep -oP '\d+\.?\d*' | tail -1 || echo "$CACHE_HIT_RATE")
-          echo "Server prefix cache hit rate: $SERVER_CACHE_HIT_RATE%"
+          if [ "$TOTAL_REQUESTS" != "0" ] && [ "$TOTAL_REQUESTS" -gt "0" ]; then
+            SERVER_CACHE_HIT_RATE=$(echo "scale=1; ($CACHE_HITS * 100) / $TOTAL_REQUESTS" | bc)
+          else
+            SERVER_CACHE_HIT_RATE="$CACHE_HIT_RATE"
+          fi
+          
+          echo "LMCache analysis: $CACHE_HITS hits out of $TOTAL_REQUESTS requests"
+          echo "Calculated cache hit rate: $SERVER_CACHE_HIT_RATE%"
+          
+          # Use benchmark prompt throughput for calculation
+          SERVER_PROMPT_TPS=$PREFILL_TPS
+          echo "Using benchmark prompt throughput: $SERVER_PROMPT_TPS tokens/s"
+          echo "Server cache hit rate: $SERVER_CACHE_HIT_RATE%"
           
           # Calculate cached input throughput using the formula:
           # cached_input_throughput = prompt_throughput × (cache_hit_rate / 100)
