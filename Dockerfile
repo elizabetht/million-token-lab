@@ -35,6 +35,7 @@ WORKDIR /app/vllm
 
 RUN python3 use_existing_torch.py
 RUN pip install -r requirements/build.txt
+RUN pip install lmcache
 
 # Set essential environment variables for build
 ENV TORCH_CUDA_ARCH_LIST=12.0f
