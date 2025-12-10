@@ -94,6 +94,7 @@ jobs:
             --name ${{ env.CONTAINER_NAME }} \
             -p ${{ env.DGX_TAILSCALE_IP}}:${{ env.VLLM_PORT }}:8000 \
             -e HF_TOKEN=${{ secrets.HF_TOKEN }} \
+            -e LMCACHE_LOG_LEVEL=WARNING \
             -e FLASHINFER_DISABLE_VERSION_CHECK=1 \
             -e LMCACHE_CONFIG_FILE=/app/config/lmcache-cpu-offload.yaml \
             -e LMCACHE_USE_EXPERIMENTAL=True \
