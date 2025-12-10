@@ -41,7 +41,7 @@ RUN pip install -r requirements/build.txt
 RUN pip install --no-build-isolation -e . -v --pre
 
 RUN git clone https://github.com/LMCache/LMCache.git
-WORKDIR /app/LMCache
+WORKDIR /app/vllm/LMCache
 RUN pip install -r requirements/build.txt
 RUN pip install -e . --no-build-isolation
 
