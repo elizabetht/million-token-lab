@@ -33,9 +33,19 @@ RUN git clone https://github.com/vllm-project/vllm.git
 
 WORKDIR /app/vllm
 
+# Install build requirements for vLLM
 RUN python3 use_existing_torch.py
 RUN pip install -r requirements/build.txt
-RUN pip install lmcache
+
+# Install LMCache from source
+WORKDIR /app
+RUN git clone https://github.com/LMCache/LMCache.git
+WORKDIR /app/LMCache
+RUN pip install -r requirements/build.txt
+RUN pip install -e . --no-build-isolation
+
+# Go back to vLLM directory
+WORKDIR /app/vllm
 
 # Set essential environment variables for build
 ENV TORCH_CUDA_ARCH_LIST=12.0f
