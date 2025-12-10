@@ -258,14 +258,6 @@
                     <li><strong>Architecture:</strong> ARM64</li>
                 </ul>
                 
-                <h3>Benchmark Configuration</h3>
-                <ul>
-                    <li><strong>Prefill Test:</strong> 50 prompts, 2048 input tokens, 16 output tokens</li>
-                    <li><strong>Decode Test:</strong> 50 prompts, 64 input tokens, 512 output tokens</li>
-                    <li><strong>Request Rate:</strong> 5 requests/second</li>
-                    <li><strong>Tool:</strong> <code>vllm bench serve</code></li>
-                </ul>
-                
                 <h3>Cost Calculation</h3>
                 <p>Cost per million tokens = (DGX hourly cost × 1,000,000) ÷ (tokens/sec × 3600)</p>
                 <p>DGX Spark economics: $4000 hardware ÷ 26,280 hours (3yr @ 30% utilization) + electricity ≈ $0.07/hour</p>
@@ -414,6 +406,7 @@
                 
                 const labels = sortedHistory.map(h => h.version || new Date(h.timestamp).toLocaleDateString());
                 const prefillData = sortedHistory.map(h => h.prefill?.tokens_per_second || 0);
+                const cachedData = sortedHistory.map(h => h.cached?.tokens_per_second || 0);
                 const decodeData = sortedHistory.map(h => h.decode?.tokens_per_second || 0);
                 
                 // Build table rows separately to avoid nested template literal issues
@@ -422,15 +415,19 @@
                     const prev = arr[i + 1];
                     const prefillTrend = prev ? (h.prefill?.tokens_per_second > prev.prefill?.tokens_per_second ? '↑' : h.prefill?.tokens_per_second < prev.prefill?.tokens_per_second ? '↓' : '') : '';
                     const decodeTrend = prev ? (h.decode?.tokens_per_second > prev.decode?.tokens_per_second ? '↑' : h.decode?.tokens_per_second < prev.decode?.tokens_per_second ? '↓' : '') : '';
+                    const cachedTrend = prev ? (h.cached?.tokens_per_second > prev.cached?.tokens_per_second ? '↑' : h.cached?.tokens_per_second < prev.cached?.tokens_per_second ? '↓' : '') : '';
                     const prefillClass = prefillTrend === '↑' ? 'trend-up' : prefillTrend === '↓' ? 'trend-down' : '';
                     const decodeClass = decodeTrend === '↑' ? 'trend-up' : decodeTrend === '↓' ? 'trend-down' : '';
+                    const cachedClass = cachedTrend === '↑' ? 'trend-up' : cachedTrend === '↓' ? 'trend-down' : '';
                     
                     return `<tr>
                         <td><span class="version-badge">${h.version || 'N/A'}</span></td>
                         <td>${h.timestamp ? new Date(h.timestamp).toLocaleDateString() : 'N/A'}</td>
                         <td class="${prefillClass}">${h.prefill?.tokens_per_second?.toLocaleString() || 'N/A'} ${prefillTrend}</td>
+                        <td class="${cachedClass}">${h.cached?.tokens_per_second?.toLocaleString() || 'N/A'} ${cachedTrend}</td>
                         <td class="${decodeClass}">${h.decode?.tokens_per_second?.toLocaleString() || 'N/A'} ${decodeTrend}</td>
                         <td>$${h.prefill?.cost_per_million_tokens?.toFixed(4) || 'N/A'}</td>
+                        <td>$${h.cached?.cost_per_million_tokens?.toFixed(4) || 'N/A'}</td>
                         <td>$${h.decode?.cost_per_million_tokens?.toFixed(4) || 'N/A'}</td>
                     </tr>`;
                 }).join('');
@@ -452,8 +449,10 @@
                                         <th>Version</th>
                                         <th>Date</th>
                                         <th>Prefill (tok/s)</th>
+                                        <th>Cached (tok/s)</th>
                                         <th>Decode (tok/s)</th>
                                         <th>Input Cost</th>
+                                        <th>Cached Cost</th>
                                         <th>Output Cost</th>
                                     </tr>
                                 </thead>
@@ -480,6 +479,14 @@
                                 data: prefillData,
                                 borderColor: '#6366f1',
                                 backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                                fill: true,
+                                tension: 0.3
+                            },
+                            {
+                                label: 'Cached Throughput (tok/s)',
+                                data: cachedData,
+                                borderColor: '#f59e0b',
+                                backgroundColor: 'rgba(245, 158, 11, 0.1)',
                                 fill: true,
                                 tension: 0.3
                             },
