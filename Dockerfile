@@ -47,12 +47,15 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 
 # Install flashinfer for ARM64/CUDA 13.0
 # Separate RUN commands for better debugging and cache granularity
+# First install without deps to avoid conflicts, then install with deps
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -U --pre flashinfer-python --index-url https://flashinfer.ai/whl/nightly --no-deps
 
+# Install with dependencies to ensure all requirements are met
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install flashinfer-python
 
+# Install additional flashinfer components
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install -U --pre flashinfer-cubin --index-url https://flashinfer.ai/whl/nightly
 
@@ -118,8 +121,10 @@ COPY --from=builder /app/vllm /app/vllm
 COPY --from=builder /app/LMCache /app/LMCache
 
 # Set environment variables
+# Use same CUDA_ARCH from builder stage
+ARG CUDA_ARCH=12.0f
 ENV PATH="/opt/venv/bin:$PATH"
-ENV TORCH_CUDA_ARCH_LIST=12.0f
+ENV TORCH_CUDA_ARCH_LIST=${CUDA_ARCH}
 ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
 ENV CUDA_HOME=/usr/local/cuda
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
