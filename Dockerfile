@@ -8,7 +8,9 @@ FROM nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04 AS builder
 
 # Set essential environment variables for build
 # These are needed during compilation and should be set early
-# CUDA_ARCH can be overridden for different GPU architectures (e.g., 8.0 for A100)
+# CUDA_ARCH can be overridden for different GPU architectures
+# Default 12.0f is used for vLLM on Grace Hopper (H100 GPU)
+# Note: The 'f' suffix is vLLM-specific notation (not standard CUDA compute capability)
 ARG CUDA_ARCH=12.0f
 ENV TORCH_CUDA_ARCH_LIST=${CUDA_ARCH}
 ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
@@ -88,7 +90,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Pin to a specific commit for reproducibility and caching
 ARG LMCACHE_COMMIT=main
 RUN --mount=type=cache,target=/root/.cache/git \
-    git clone https://github.com/LMCache/LMCache.git && \
+    git clone https://github.com/LMCache/LMCache.git /app/LMCache && \
     cd /app/LMCache && \
     git checkout ${LMCACHE_COMMIT}
 
@@ -106,10 +108,11 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 FROM nvidia/cuda:13.0.2-cudnn-runtime-ubuntu24.04 AS runtime
 
 # Install only runtime dependencies (no build tools needed)
+# python3-dev is included for potential JIT compilation needs
 RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     apt-get update && apt-get install -y \
-    python3.12 python3.12-venv
+    python3.12 python3.12-dev python3.12-venv
 
 # Copy the virtual environment from builder
 COPY --from=builder /opt/venv /opt/venv

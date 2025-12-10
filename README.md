@@ -57,7 +57,9 @@ The build workflow uses GitHub Actions cache (`type=gha`) to persist layers betw
 To maximize cache reuse, the Dockerfile supports build arguments:
 - `VLLM_COMMIT`: Pin vLLM to a specific git commit (default: `main`)
 - `LMCACHE_COMMIT`: Pin LMCache to a specific commit (default: `main`)
-- `CUDA_ARCH`: Target CUDA architecture for compilation (default: `12.0f` for DGX Spark)
+- `CUDA_ARCH`: Target CUDA architecture for compilation (default: `12.0f` for DGX Spark/H100)
+  - Note: The default `12.0f` is vLLM-specific notation for Grace Hopper architecture
+  - For other GPUs, use standard compute capability values (e.g., `8.0` for A100, `9.0` for H100)
 
 Example of building with pinned versions:
 ```bash
