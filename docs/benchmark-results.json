@@ -3,18 +3,18 @@
   "dgx_cost_per_hour": 0.07,
   "image_tag": "ghcr.io/elizabetht/token-labs/vllm-serve:latest",
   "prefill": {
-    "tokens_per_second": 715.25,
-    "cost_per_million_tokens": 0.0271
+    "tokens_per_second": 0.0,
+    "cost_per_million_tokens": 0.0
   },
   "cached": {
     "tokens_per_second": 0.0,
     "cost_per_million_tokens": 0.0
   },
   "decode": {
-    "tokens_per_second": 176.9,
-    "cost_per_million_tokens": 0.1099
+    "tokens_per_second": 0.0,
+    "cost_per_million_tokens": 0.0
   },
-  "timestamp": "2025-12-10T00:30:52.451524Z",
+  "timestamp": "2025-12-10T15:42:48.703055Z",
   "vllm_server_args": {
     "gpu_memory_utilization": 0.3,
     "max_model_len": 131072,
@@ -46,6 +46,15 @@
       "output_len": 8192,
       "ratio": "1:8 input:output",
       "total_tokens": 9216
+    },
+    "cache_test": {
+      "dataset": "prefix_repetition",
+      "num_prompts": 100,
+      "prefix_len": 512,
+      "suffix_len": 128,
+      "num_prefixes": 5,
+      "output_len": 128,
+      "description": "Tests LMCache with repeated prefixes"
     }
   },
   "hardware": {

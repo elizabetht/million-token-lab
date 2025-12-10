@@ -131,64 +131,60 @@ jobs:
           echo "Running vLLM serving benchmarks..."
           DGX_COST=${{ env.DGX_COST_PER_HOUR }}
           
-          echo "========================================"
-          # === PREFILL-HEAVY BENCHMARK ===
-          # 8:1 input:output ratio to measure prefill (input) performance
-          # 8192 input + 1024 output = 9216 total tokens per request
-          echo "=== PREFILL-HEAVY BENCHMARK (8:1 input:output ratio) ===="
-          docker exec ${{ env.CONTAINER_NAME }} \
-            bash -c "source /opt/venv/bin/activate && \
-            FLASHINFER_DISABLE_VERSION_CHECK=1 \
-            vllm bench serve \
-            --model ${{ env.MODEL }} \
-            --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
-            --num-prompts 100 \
-            --request-rate 10 \
-            --random-input-len 8192 \
-            --random-output-len 1024" \
-            2>&1 | tee prefill_bench.txt
+          # echo "========================================"
+          # # === PREFILL-HEAVY BENCHMARK ===
+          # # 8:1 input:output ratio to measure prefill (input) performance
+          # # 8192 input + 1024 output = 9216 total tokens per request
+          # echo "=== PREFILL-HEAVY BENCHMARK (8:1 input:output ratio) ===="
+          # docker exec ${{ env.CONTAINER_NAME }} \
+          #   bash -c "source /opt/venv/bin/activate && \
+          #   FLASHINFER_DISABLE_VERSION_CHECK=1 \
+          #   vllm bench serve \
+          #   --model ${{ env.MODEL }} \
+          #   --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
+          #   --num-prompts 100 \
+          #   --request-rate 10 \
+          #   --random-input-len 8192 \
+          #   --random-output-len 1024" \
+          #   2>&1 | tee prefill_bench.txt
           
-          cat prefill_bench.txt
+          # cat prefill_bench.txt
           
-          # Extract prefill throughput (input tokens/s)
-          PREFILL_TPS=$(grep -oP 'Input throughput \(tok/s\):\s*\K[\d.]+' prefill_bench.txt | tail -1 || echo "0")
-          if [ "$PREFILL_TPS" = "0" ] || [ -z "$PREFILL_TPS" ]; then
-            # Fallback to total throughput if input not found
-            PREFILL_TPS=$(grep -oP 'Total Token throughput \(tok/s\):\s*\K[\d.]+' prefill_bench.txt | tail -1 || echo "0")
-          fi
-          echo "Prefill throughput: $PREFILL_TPS tokens/s"
+          # # Extract prefill throughput (input tokens/s)
+          # PREFILL_TPS=$(grep -oP 'Input throughput \(tok/s\):\s*\K[\d.]+' prefill_bench.txt | tail -1 || echo "0")
+          # if [ "$PREFILL_TPS" = "0" ] || [ -z "$PREFILL_TPS" ]; then
+          #   # Fallback to total throughput if input not found
+          #   PREFILL_TPS=$(grep -oP 'Total Token throughput \(tok/s\):\s*\K[\d.]+' prefill_bench.txt | tail -1 || echo "0")
+          # fi
+          # echo "Prefill throughput: $PREFILL_TPS tokens/s"
           
-          # Extract cached input tokens throughput (for LMCache)
-          CACHED_TPS=$(grep -oP 'Cached input throughput \(tok/s\):\s*\K[\d.]+' prefill_bench.txt | tail -1 || echo "0")
-          echo "Cached input throughput: $CACHED_TPS tokens/s"
+          # echo "========================================"
+          # # === DECODE-HEAVY BENCHMARK ===
+          # # 1:8 input:output ratio to measure decode (output) performance
+          # # 1024 input + 8192 output = 9216 total tokens per request
+          # echo ""
+          # echo "=== DECODE-HEAVY BENCHMARK (1:8 input:output ratio) ===="
+          # docker exec ${{ env.CONTAINER_NAME }} \
+          #   bash -c "source /opt/venv/bin/activate && \
+          #   FLASHINFER_DISABLE_VERSION_CHECK=1 \
+          #   vllm bench serve \
+          #   --model ${{ env.MODEL }} \
+          #   --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
+          #   --num-prompts 100 \
+          #   --request-rate 10 \
+          #   --random-input-len 1024 \
+          #   --random-output-len 8192" \
+          #   2>&1 | tee decode_bench.txt
           
-          echo "========================================"
-          # === DECODE-HEAVY BENCHMARK ===
-          # 1:8 input:output ratio to measure decode (output) performance
-          # 1024 input + 8192 output = 9216 total tokens per request
-          echo ""
-          echo "=== DECODE-HEAVY BENCHMARK (1:8 input:output ratio) ===="
-          docker exec ${{ env.CONTAINER_NAME }} \
-            bash -c "source /opt/venv/bin/activate && \
-            FLASHINFER_DISABLE_VERSION_CHECK=1 \
-            vllm bench serve \
-            --model ${{ env.MODEL }} \
-            --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
-            --num-prompts 100 \
-            --request-rate 10 \
-            --random-input-len 1024 \
-            --random-output-len 8192" \
-            2>&1 | tee decode_bench.txt
+          # cat decode_bench.txt
           
-          cat decode_bench.txt
-          
-          # Extract decode throughput (output tokens/s)
-          DECODE_TPS=$(grep -oP 'Output throughput \(tok/s\):\s*\K[\d.]+' decode_bench.txt | tail -1 || echo "0")
-          if [ "$DECODE_TPS" = "0" ] || [ -z "$DECODE_TPS" ]; then
-            # Fallback to total throughput if output not found
-            DECODE_TPS=$(grep -oP 'Total Token throughput \(tok/s\):\s*\K[\d.]+' decode_bench.txt | tail -1 || echo "0")
-          fi
-          echo "Decode throughput: $DECODE_TPS tokens/s"
+          # # Extract decode throughput (output tokens/s)
+          # DECODE_TPS=$(grep -oP 'Output throughput \(tok/s\):\s*\K[\d.]+' decode_bench.txt | tail -1 || echo "0")
+          # if [ "$DECODE_TPS" = "0" ] || [ -z "$DECODE_TPS" ]; then
+          #   # Fallback to total throughput if output not found
+          #   DECODE_TPS=$(grep -oP 'Total Token throughput \(tok/s\):\s*\K[\d.]+' decode_bench.txt | tail -1 || echo "0")
+          # fi
+          # echo "Decode throughput: $DECODE_TPS tokens/s"
           
           echo "========================================"
           # === PREFIX CACHE BENCHMARK ===
@@ -203,7 +199,7 @@ jobs:
             --model ${{ env.MODEL }} \
             --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
             --dataset-name prefix_repetition \
-            --num-prompts 100 \
+            --num-prompts 10 \
             --prefix-repetition-prefix-len 512 \
             --prefix-repetition-suffix-len 128 \
             --prefix-repetition-num-prefixes 5 \
@@ -224,9 +220,52 @@ jobs:
           CACHE_HIT_RATE=$(grep -oP 'Prefix cache hit rate:\s*\K[\d.]+' cache_bench.txt | tail -1 || echo "0")
           echo "Prefix cache hit rate: $CACHE_HIT_RATE%"
           
-          # Use the cache benchmark result for CACHED_TPS if it's better
+          # Calculate cached input throughput using server metrics formula:
+          # Cached input throughput = Avg prompt throughput × Prefix cache hit rate
+          echo "========================================"
+          echo ""
+          echo "=== EXTRACTING SERVER METRICS FOR CACHED THROUGHPUT CALCULATION ==="
+          
+          # Get recent server logs to extract cache hit information
+          docker logs ${{ env.CONTAINER_NAME }} --tail 200 > server_logs.txt
+          
+          # Calculate cache hit rate from LMCache logs
+          # Count cache hits vs total requests from LMCache logs
+          TOTAL_REQUESTS=$(grep -c "LMCache hit tokens:" server_logs.txt || echo "0")
+          CACHE_HITS=$(grep "LMCache hit tokens:" server_logs.txt | grep -v "LMCache hit tokens: 0" | wc -l || echo "0")
+          
+          if [ "$TOTAL_REQUESTS" != "0" ] && [ "$TOTAL_REQUESTS" -gt "0" ]; then
+            SERVER_CACHE_HIT_RATE=$(echo "scale=1; ($CACHE_HITS * 100) / $TOTAL_REQUESTS" | bc)
+          else
+            SERVER_CACHE_HIT_RATE="$CACHE_HIT_RATE"
+          fi
+          
+          echo "LMCache analysis: $CACHE_HITS hits out of $TOTAL_REQUESTS requests"
+          echo "Calculated cache hit rate: $SERVER_CACHE_HIT_RATE%"
+          
+          # Use benchmark prompt throughput for calculation
+          SERVER_PROMPT_TPS=$PREFILL_TPS
+          echo "Using benchmark prompt throughput: $SERVER_PROMPT_TPS tokens/s"
+          echo "Server cache hit rate: $SERVER_CACHE_HIT_RATE%"
+          
+          # Calculate cached input throughput using the formula:
+          # cached_input_throughput = prompt_throughput × (cache_hit_rate / 100)
+          if [ "$SERVER_PROMPT_TPS" != "0" ] && [ "$SERVER_CACHE_HIT_RATE" != "0" ]; then
+            CALCULATED_CACHED_TPS=$(echo "scale=2; $SERVER_PROMPT_TPS * ($SERVER_CACHE_HIT_RATE / 100)" | bc)
+            echo "Calculated cached input throughput: $CALCULATED_CACHED_TPS tokens/s"
+            echo "(Formula: $SERVER_PROMPT_TPS × $SERVER_CACHE_HIT_RATE% = $CALCULATED_CACHED_TPS tokens/s)"
+          else
+            CALCULATED_CACHED_TPS="0"
+            echo "Cannot calculate cached throughput: insufficient server metrics"
+          fi
+          
+          # Use the better of benchmark result or calculated result
           if [ "$CACHE_TEST_TPS" != "0" ] && [ -n "$CACHE_TEST_TPS" ]; then
             CACHED_TPS=$CACHE_TEST_TPS
+            echo "Using benchmark cached throughput: $CACHED_TPS tokens/s"
+          elif [ "$CALCULATED_CACHED_TPS" != "0" ] && [ -n "$CALCULATED_CACHED_TPS" ]; then
+            CACHED_TPS=$CALCULATED_CACHED_TPS
+            echo "Using calculated cached throughput: $CACHED_TPS tokens/s"
           fi
           
           # Use extracted values

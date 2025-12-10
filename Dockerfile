@@ -23,7 +23,9 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
     --mount=type=cache,target=/var/lib/apt/lists,sharing=locked \
     apt-get update && apt-get install -y \
     python3.12 python3.12-dev python3.12-venv python3-pip \
-    git wget patch curl ca-certificates cmake build-essential ninja-build
+    git wget patch curl ca-certificates cmake build-essential ninja-build \
+    gcc-aarch64-linux-gnu g++-aarch64-linux-gnu \
+    && rm -rf /var/lib/apt/lists/*
 
 # Set working directory
 WORKDIR /app
@@ -46,6 +48,15 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # These are smaller and can be cached together
 RUN --mount=type=cache,target=/root/.cache/pip \
     pip install xgrammar triton
+
+# Set essential environment variables for build BEFORE building packages
+ENV TORCH_CUDA_ARCH_LIST="8.9;9.0;12.1"
+ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
+ENV CUDA_HOME=/usr/local/cuda
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+ENV FORCE_CUDA=1
+ENV MAX_JOBS=4
+ENV TORCH_USE_CUDA_DSA=0
 
 # Install flashinfer for ARM64/CUDA 13.0
 # Separate RUN commands for better debugging and cache granularity
