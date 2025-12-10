@@ -131,67 +131,44 @@ jobs:
           echo "Running vLLM serving benchmarks..."
           DGX_COST=${{ env.DGX_COST_PER_HOUR }}
           
-          # echo "========================================"
-          # # === PREFILL-HEAVY BENCHMARK ===
-          # # 3:1 input:output ratio to measure prefill (input) performance
-          # # 3072 input + 1024 output = 4096 total tokens per request
-          # echo "=== PREFILL-HEAVY BENCHMARK (3:1 input:output ratio) ===="
-          # docker exec ${{ env.CONTAINER_NAME }} \
-          #   bash -c "source /opt/venv/bin/activate && \
-          #   FLASHINFER_DISABLE_VERSION_CHECK=1 \
-          #   vllm bench serve \
-          #   --model ${{ env.MODEL }} \
-          #   --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
-          #   --num-prompts 100 \
-          #   --request-rate 10 \
-          #   --random-input-len 3072 \
-          #   --random-output-len 1024" \
-          #   2>&1 | tee prefill_bench.txt
-          
-          # cat prefill_bench.txt
-          
-          # # Extract prefill throughput (input tokens/s)
-          # PREFILL_TPS=$(grep -oP 'Input throughput \(tok/s\):\s*\K[\d.]+' prefill_bench.txt | tail -1 || echo "0")
-          # if [ "$PREFILL_TPS" = "0" ] || [ -z "$PREFILL_TPS" ]; then
-          #   # Fallback to total throughput if input not found
-          #   PREFILL_TPS=$(grep -oP 'Total Token throughput \(tok/s\):\s*\K[\d.]+' prefill_bench.txt | tail -1 || echo "0")
-          # fi
-          # echo "Prefill throughput: $PREFILL_TPS tokens/s"
-          
-          # echo "========================================"
-          # # === DECODE-HEAVY BENCHMARK ===
-          # # 1:3 input:output ratio to measure decode (output) performance
-          # # 1024 input + 3072 output = 4096 total tokens per request
-          # echo ""
-          # echo "=== DECODE-HEAVY BENCHMARK (1:3 input:output ratio) ===="
-          # docker exec ${{ env.CONTAINER_NAME }} \
-          #   bash -c "source /opt/venv/bin/activate && \
-          #   FLASHINFER_DISABLE_VERSION_CHECK=1 \
-          #   vllm bench serve \
-          #   --model ${{ env.MODEL }} \
-          #   --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
-          #   --num-prompts 100 \
-          #   --request-rate 10 \
-          #   --random-input-len 1024 \
-          #   --random-output-len 3072" \
-          #   2>&1 | tee decode_bench.txt
-          
-          # cat decode_bench.txt
-          
-          # # Extract decode throughput (output tokens/s)
-          # DECODE_TPS=$(grep -oP 'Output throughput \(tok/s\):\s*\K[\d.]+' decode_bench.txt | tail -1 || echo "0")
-          # if [ "$DECODE_TPS" = "0" ] || [ -z "$DECODE_TPS" ]; then
-          #   # Fallback to total throughput if output not found
-          #   DECODE_TPS=$(grep -oP 'Total Token throughput \(tok/s\):\s*\K[\d.]+' decode_bench.txt | tail -1 || echo "0")
-          # fi
-          # echo "Decode throughput: $DECODE_TPS tokens/s"
-          
           echo "========================================"
-          # === PREFIX CACHE BENCHMARK ===
-          # Uses prefix_repetition dataset to test LMCache effectiveness
-          # 5 unique prefixes repeated across 100 prompts = high cache hit potential
-          echo ""
-          echo "=== PREFIX CACHE BENCHMARK (LMCache test with repeated prefixes) ===="
+          echo "Running three benchmarks in parallel..."
+          echo "========================================"
+          
+          # === RUN ALL THREE BENCHMARKS IN PARALLEL ===
+          
+          # PREFILL-HEAVY BENCHMARK (3:1 input:output ratio)
+          echo "Starting PREFILL-HEAVY benchmark in background..."
+          docker exec ${{ env.CONTAINER_NAME }} \
+            bash -c "source /opt/venv/bin/activate && \
+            FLASHINFER_DISABLE_VERSION_CHECK=1 \
+            vllm bench serve \
+            --model ${{ env.MODEL }} \
+            --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
+            --num-prompts 100 \
+            --request-rate 10 \
+            --random-input-len 3072 \
+            --random-output-len 1024" \
+            > prefill_bench.txt 2>&1 &
+          PREFILL_PID=$!
+          
+          # DECODE-HEAVY BENCHMARK (1:3 input:output ratio)  
+          echo "Starting DECODE-HEAVY benchmark in background..."
+          docker exec ${{ env.CONTAINER_NAME }} \
+            bash -c "source /opt/venv/bin/activate && \
+            FLASHINFER_DISABLE_VERSION_CHECK=1 \
+            vllm bench serve \
+            --model ${{ env.MODEL }} \
+            --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
+            --num-prompts 100 \
+            --request-rate 10 \
+            --random-input-len 1024 \
+            --random-output-len 3072" \
+            > decode_bench.txt 2>&1 &
+          DECODE_PID=$!
+          
+          # PREFIX CACHE BENCHMARK (LMCache effectiveness test)
+          echo "Starting PREFIX CACHE benchmark in background..."
           docker exec ${{ env.CONTAINER_NAME }} \
             bash -c "source /opt/venv/bin/activate && \
             FLASHINFER_DISABLE_VERSION_CHECK=1 \
@@ -204,9 +181,62 @@ jobs:
             --prefix-repetition-suffix-len 128 \
             --prefix-repetition-num-prefixes 5 \
             --prefix-repetition-output-len 128" \
-            2>&1 | tee cache_bench.txt
+            > cache_bench.txt 2>&1 &
+          CACHE_PID=$!
           
+          echo "All three benchmarks started in parallel..."
+          echo "Waiting for completion..."
+          
+          # Wait for all benchmarks to complete
+          wait $PREFILL_PID
+          PREFILL_EXIT=$?
+          echo "✅ Prefill benchmark completed (exit code: $PREFILL_EXIT)"
+          
+          wait $DECODE_PID  
+          DECODE_EXIT=$?
+          echo "✅ Decode benchmark completed (exit code: $DECODE_EXIT)"
+          
+          wait $CACHE_PID
+          CACHE_EXIT=$?
+          echo "✅ Cache benchmark completed (exit code: $CACHE_EXIT)"
+          
+          echo "========================================"
+          echo "All benchmarks completed! Processing results..."
+          echo "========================================"
+          
+          # Display results
+          echo ""
+          echo "=== PREFILL-HEAVY BENCHMARK RESULTS ==="
+          cat prefill_bench.txt
+          
+          echo ""
+          echo "=== DECODE-HEAVY BENCHMARK RESULTS ==="  
+          cat decode_bench.txt
+          
+          echo ""
+          echo "=== PREFIX CACHE BENCHMARK RESULTS ==="
           cat cache_bench.txt
+          
+          echo ""
+          echo "========================================"
+          echo "EXTRACTING METRICS FROM ALL BENCHMARKS"
+          echo "========================================"
+          
+          # Extract prefill throughput (input tokens/s) from prefill-heavy benchmark
+          PREFILL_TPS=$(grep -oP 'Input throughput \(tok/s\):\s*\K[\d.]+' prefill_bench.txt | tail -1 || echo "0")
+          if [ "$PREFILL_TPS" = "0" ] || [ -z "$PREFILL_TPS" ]; then
+            # Fallback to total throughput if input not found
+            PREFILL_TPS=$(grep -oP 'Total Token throughput \(tok/s\):\s*\K[\d.]+' prefill_bench.txt | tail -1 || echo "0")
+          fi
+          echo "Prefill throughput: $PREFILL_TPS tokens/s"
+          
+          # Extract decode throughput (output tokens/s) from decode-heavy benchmark  
+          DECODE_TPS=$(grep -oP 'Output throughput \(tok/s\):\s*\K[\d.]+' decode_bench.txt | tail -1 || echo "0")
+          if [ "$DECODE_TPS" = "0" ] || [ -z "$DECODE_TPS" ]; then
+            # Fallback to total throughput if output not found
+            DECODE_TPS=$(grep -oP 'Total Token throughput \(tok/s\):\s*\K[\d.]+' decode_bench.txt | tail -1 || echo "0")
+          fi
+          echo "Decode throughput: $DECODE_TPS tokens/s"
           
           # Extract cached throughput from prefix_repetition benchmark
           CACHE_TEST_TPS=$(grep -oP 'Cached input throughput \(tok/s\):\s*\K[\d.]+' cache_bench.txt | tail -1 || echo "0")
