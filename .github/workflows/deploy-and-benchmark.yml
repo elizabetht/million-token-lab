@@ -52,18 +52,20 @@ jobs:
             # Get version from the tag that triggered the build workflow
             # workflow_run event provides head_branch which contains the tag name
             TAG="${{ github.event.workflow_run.head_branch }}"
-            # Remove 'v' prefix if present (v0.1.0 -> 0.1.0)
-            TAG="${TAG#v}"
             # Fallback to latest if tag is empty
             if [ -z "$TAG" ]; then
               TAG="latest"
             fi
           fi
           
+          # For version tracking, remove 'v' prefix if present (v0.1.0 -> 0.1.0)
+          VERSION_TAG="${TAG#v}"
+          
           echo "IMAGE=${IMAGE}" >> "$GITHUB_OUTPUT"
           echo "TAG=${TAG}" >> "$GITHUB_OUTPUT"
+          echo "VERSION_TAG=${VERSION_TAG}" >> "$GITHUB_OUTPUT"
           echo "FULL_IMAGE=${IMAGE}:${TAG}" >> "$GITHUB_OUTPUT"
-          echo "Using image tag: $TAG"
+          echo "Using image tag: $TAG (version: $VERSION_TAG)"
 
       - name: Log in to GHCR
         uses: docker/login-action@v3
@@ -449,7 +451,7 @@ jobs:
               new_result = json.load(f)
           
           # Add version from image tag
-          version_tag = '${{ steps.vars.outputs.TAG }}'
+          version_tag = '${{ steps.vars.outputs.VERSION_TAG }}'
           new_result['version'] = version_tag
           
           # Only add to history for stable releases (not pre-releases)
