@@ -425,6 +425,11 @@
               <td class="pricing-tag" id="price-input">$0.0000</td>
             </tr>
             <tr>
+              <td>Cached input tokens</td>
+              <td>per 1M</td>
+              <td class="pricing-tag" id="price-cached-input">$0.0000</td>
+            </tr>
+            <tr>
               <td>Output tokens (completion)</td>
               <td>per 1M</td>
               <td class="pricing-tag" id="price-output">$0.0000</td>
@@ -515,6 +520,7 @@
     const pillEndpoint = document.getElementById("pill-endpoint");
     const modelDetails = document.getElementById("model-details");
     const priceInputEl = document.getElementById("price-input");
+    const priceCachedInputEl = document.getElementById("price-cached-input");
     const priceOutputEl = document.getElementById("price-output");
     const chatModelLabel = document.getElementById("chat-model-label");
     const chatLogEl = document.getElementById("chat-log");
@@ -591,6 +597,9 @@
 
       if (priceInputEl) {
         priceInputEl.textContent = `$${cfg.inputPricePerM.toFixed(2)}`;
+      }
+      if (priceCachedInputEl) {
+        priceCachedInputEl.textContent = `$${cfg.cachedInputPricePerM.toFixed(4)}`;
       }
       if (priceOutputEl) {
         priceOutputEl.textContent = `$${cfg.outputPricePerM.toFixed(2)}`;

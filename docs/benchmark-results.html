@@ -422,6 +422,7 @@
                 
                 const labels = sortedHistory.map(h => h.version || new Date(h.timestamp).toLocaleDateString());
                 const prefillData = sortedHistory.map(h => h.prefill?.tokens_per_second || 0);
+                const cachedData = sortedHistory.map(h => h.cached?.tokens_per_second || 0);
                 const decodeData = sortedHistory.map(h => h.decode?.tokens_per_second || 0);
                 
                 // Build table rows separately to avoid nested template literal issues
@@ -429,16 +430,20 @@
                 const tableRows = reversedHistory.map((h, i, arr) => {
                     const prev = arr[i + 1];
                     const prefillTrend = prev ? (h.prefill?.tokens_per_second > prev.prefill?.tokens_per_second ? '↑' : h.prefill?.tokens_per_second < prev.prefill?.tokens_per_second ? '↓' : '') : '';
+                    const cachedTrend = prev ? (h.cached?.tokens_per_second > prev.cached?.tokens_per_second ? '↑' : h.cached?.tokens_per_second < prev.cached?.tokens_per_second ? '↓' : '') : '';
                     const decodeTrend = prev ? (h.decode?.tokens_per_second > prev.decode?.tokens_per_second ? '↑' : h.decode?.tokens_per_second < prev.decode?.tokens_per_second ? '↓' : '') : '';
                     const prefillClass = prefillTrend === '↑' ? 'trend-up' : prefillTrend === '↓' ? 'trend-down' : '';
+                    const cachedClass = cachedTrend === '↑' ? 'trend-up' : cachedTrend === '↓' ? 'trend-down' : '';
                     const decodeClass = decodeTrend === '↑' ? 'trend-up' : decodeTrend === '↓' ? 'trend-down' : '';
                     
                     return `<tr>
                         <td><span class="version-badge">${h.version || 'N/A'}</span></td>
                         <td>${h.timestamp ? new Date(h.timestamp).toLocaleDateString() : 'N/A'}</td>
                         <td class="${prefillClass}">${h.prefill?.tokens_per_second?.toLocaleString() || 'N/A'} ${prefillTrend}</td>
+                        <td class="${cachedClass}">${h.cached?.tokens_per_second?.toLocaleString() || 'N/A'} ${cachedTrend}</td>
                         <td class="${decodeClass}">${h.decode?.tokens_per_second?.toLocaleString() || 'N/A'} ${decodeTrend}</td>
                         <td>$${h.prefill?.cost_per_million_tokens?.toFixed(4) || 'N/A'}</td>
+                        <td>$${h.cached?.cost_per_million_tokens?.toFixed(4) || 'N/A'}</td>
                         <td>$${h.decode?.cost_per_million_tokens?.toFixed(4) || 'N/A'}</td>
                     </tr>`;
                 }).join('');
@@ -460,8 +465,10 @@
                                         <th>Version</th>
                                         <th>Date</th>
                                         <th>Prefill (tok/s)</th>
+                                        <th>Cached Input (tok/s)</th>
                                         <th>Decode (tok/s)</th>
                                         <th>Input Cost</th>
+                                        <th>Cached Cost</th>
                                         <th>Output Cost</th>
                                     </tr>
                                 </thead>
@@ -488,6 +495,14 @@
                                 data: prefillData,
                                 borderColor: '#6366f1',
                                 backgroundColor: 'rgba(99, 102, 241, 0.1)',
+                                fill: true,
+                                tension: 0.3
+                            },
+                            {
+                                label: 'Cached Input Throughput (tok/s)',
+                                data: cachedData,
+                                borderColor: '#a855f7',
+                                backgroundColor: 'rgba(168, 85, 247, 0.1)',
                                 fill: true,
                                 tension: 0.3
                             },
