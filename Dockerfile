@@ -50,9 +50,9 @@ RUN python3 use_existing_torch.py
 RUN --mount=type=cache,target=/root/.cache/pip /opt/venv/bin/pip install -r requirements/build.txt
 
 # Install vLLM with local build (source build for ARM64)
-# RUN --mount=type=cache,target=/root/.cache/pip \
-#     --mount=type=cache,target=/app/vllm/build \
-#     /opt/venv/bin/pip install --no-build-isolation -e . -v --pre
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=cache,target=/app/vllm/build \
+    /opt/venv/bin/pip install --no-build-isolation -e . -v --pre
 
 RUN --mount=type=cache,target=/root/.cache/git git clone https://github.com/LMCache/LMCache.git
 WORKDIR /app/vllm/LMCache
