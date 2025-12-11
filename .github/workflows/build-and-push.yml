@@ -51,6 +51,7 @@ jobs:
           provenance: false
           tags: |
             ${{ steps.vars.outputs.IMAGE }}:${{ steps.vars.outputs.VERSION }}
+            ${{ steps.vars.outputs.IMAGE }}:${{ github.ref_name }}
             ${{ steps.vars.outputs.IMAGE }}:latest
         env:
           DOCKER_BUILD_SUMMARY: false

@@ -77,7 +77,22 @@ jobs:
       - name: Pull latest image
         run: |
           echo "Pulling image: ${{ steps.vars.outputs.FULL_IMAGE }}"
-          docker pull ${{ steps.vars.outputs.FULL_IMAGE }}
+          # Try to pull the image with the specified tag first
+          if ! docker pull ${{ steps.vars.outputs.FULL_IMAGE }}; then
+            # If that fails and the tag starts with 'v', try without the 'v' prefix
+            TAG="${{ steps.vars.outputs.TAG }}"
+            if [[ "${TAG}" == v* ]]; then
+              FALLBACK_TAG="${TAG#v}"
+              FALLBACK_IMAGE="${{ steps.vars.outputs.IMAGE }}:${FALLBACK_TAG}"
+              echo "Failed to pull ${{ steps.vars.outputs.FULL_IMAGE }}, trying fallback: ${FALLBACK_IMAGE}"
+              docker pull "${FALLBACK_IMAGE}"
+              # Update the image reference for subsequent steps
+              echo "FULL_IMAGE=${FALLBACK_IMAGE}" >> $GITHUB_ENV
+            else
+              echo "Failed to pull image and no fallback available"
+              exit 1
+            fi
+          fi
 
       - name: Stop existing vLLM container (if running)
         run: |
@@ -93,6 +108,8 @@ jobs:
       - name: Start vLLM server
         run: |
           echo "Starting vLLM server with model: ${{ env.MODEL }} (LMCache enabled)"
+          CONTAINER_IMAGE="${FULL_IMAGE:-${{ steps.vars.outputs.FULL_IMAGE }}}"
+          echo "Using container image: ${CONTAINER_IMAGE}"
           docker run -d \
             --gpus all \
             --name ${{ env.CONTAINER_NAME }} \
@@ -104,7 +121,7 @@ jobs:
             # -e LMCACHE_USE_EXPERIMENTAL=True \
             -v $HOME/.cache/huggingface:/root/.cache/huggingface \
             # -v ${{ github.workspace }}/config:/app/config:ro \
-            ${{ steps.vars.outputs.FULL_IMAGE }} \
+            "${CONTAINER_IMAGE}" \
             ${{ env.MODEL }} \
             --gpu-memory-utilization 0.3 \
             # --kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}' \
