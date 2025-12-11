@@ -30,7 +30,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     /opt/venv/bin/pip install flashinfer-python && \
     /opt/venv/bin/pip install -U --pre flashinfer-cubin --index-url https://flashinfer.ai/whl/nightly && \
     /opt/venv/bin/pip install -U --pre flashinfer-jit-cache --index-url https://flashinfer.ai/whl/cu130
-    
+
 # Set essential environment variables for build BEFORE building packages
 ENV TORCH_CUDA_ARCH_LIST="12.1a"
 ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
@@ -56,17 +56,17 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     --mount=type=cache,target=/app/vllm/build \
     /opt/venv/bin/pip install --no-build-isolation -e . -v --pre
 
-# RUN --mount=type=cache,target=/root/.cache/git git clone https://github.com/LMCache/LMCache.git
-# WORKDIR /app/vllm/LMCache
-# RUN --mount=type=cache,target=/root/.cache/pip /opt/venv/bin/pip install -r requirements/build.txt
+RUN --mount=type=cache,target=/root/.cache/git git clone https://github.com/LMCache/LMCache.git
+WORKDIR /app/vllm/LMCache
+RUN --mount=type=cache,target=/root/.cache/pip /opt/venv/bin/pip install -r requirements/build.txt
 
 # Set additional environment variables specifically for LMCache build
 ENV NVCC_APPEND_FLAGS="-gencode arch=compute_121,code=sm_121"
 
 # Try installation without build isolation first, if it fails try with build isolation
-# RUN --mount=type=cache,target=/root/.cache/pip \
-#     --mount=type=cache,target=/app/vllm/LMCache/build \
-#     /opt/venv/bin/pip install -e . --no-build-isolation || pip install -e .
+RUN --mount=type=cache,target=/root/.cache/pip \
+    --mount=type=cache,target=/app/vllm/LMCache/build \
+    /opt/venv/bin/pip install -e . --no-build-isolation || pip install -e .
 
 # Clean up build artifacts
 RUN rm -rf /app/vllm/.git && rm -rf /tmp/* 
