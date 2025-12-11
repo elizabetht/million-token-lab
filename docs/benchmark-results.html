@@ -262,9 +262,16 @@
                 <ul>
                     <li><strong>Prefill Test:</strong> 100 prompts, 3072 input tokens, 1024 output tokens (3:1 ratio)</li>
                     <li><strong>Decode Test:</strong> 100 prompts, 1024 input tokens, 3072 output tokens (1:3 ratio)</li>
-                    <li><strong>Cache Test:</strong> 100 prompts, 512 prefix + 128 suffix tokens, 128 output tokens, 5 unique prefixes</li>
+                    <li><strong>Cache Test:</strong> Disabled (LMCache image not ready) - cached metrics show as 0</li>
                     <li><strong>Request Rate:</strong> 10 requests/second</li>
                     <li><strong>Tool:</strong> <code>vllm bench serve</code></li>
+                </ul>
+                
+                <h3>Metrics Extraction</h3>
+                <ul>
+                    <li><strong>Prefill Throughput:</strong> Total token throughput from prefill-heavy test</li>
+                    <li><strong>Decode Throughput:</strong> Output token throughput from decode-heavy test</li>
+                    <li><strong>Cached Throughput:</strong> Set to 0 (cache test disabled)</li>
                 </ul>
                 
                 <h3>Cost Calculation</h3>
