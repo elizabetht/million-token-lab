@@ -261,8 +261,8 @@
                 <h3>Benchmark Configuration</h3>
                 <ul>
                     <li><strong>Prefill Test:</strong> 100 prompts, 3072 input tokens, 1024 output tokens (3:1 ratio)</li>
+                    <li><strong>Cache Test:</strong> Enabled (LMCache with CPU offload) - 100 prompts with prefix repetition</li>
                     <li><strong>Decode Test:</strong> 100 prompts, 1024 input tokens, 3072 output tokens (1:3 ratio)</li>
-                    <li><strong>Cache Test:</strong> Disabled (LMCache image not ready) - cached metrics show as 0</li>
                     <li><strong>Request Rate:</strong> 10 requests/second</li>
                     <li><strong>Tool:</strong> <code>vllm bench serve</code></li>
                 </ul>
@@ -270,8 +270,8 @@
                 <h3>Metrics Extraction</h3>
                 <ul>
                     <li><strong>Prefill Throughput:</strong> Total token throughput from prefill-heavy test</li>
+                    <li><strong>Cached Throughput:</strong> Calculated from server metrics (prompt throughput × cache hit rate)</li>
                     <li><strong>Decode Throughput:</strong> Output token throughput from decode-heavy test</li>
-                    <li><strong>Cached Throughput:</strong> Set to 0 (cache test disabled)</li>
                 </ul>
                 
                 <h3>Cost Calculation</h3>
@@ -344,40 +344,40 @@
                                 <tr>
                                     <th>Parameter</th>
                                     <th>Prefill Test</th>
-                                    <th>Decode Test</th>
                                     <th>Cache Test</th>
+                                    <th>Decode Test</th>
                                 </tr>
                             </thead>
                             <tbody>
                                 <tr>
                                     <td>Number of Prompts</td>
                                     <td>${data.benchmark_args.prefill_test.num_prompts}</td>
-                                    <td>${data.benchmark_args.decode_test.num_prompts}</td>
                                     <td>${data.benchmark_args.cache_test.num_prompts}</td>
+                                    <td>${data.benchmark_args.decode_test.num_prompts}</td>
                                 </tr>
                                 <tr>
                                     <td>Request Rate</td>
                                     <td>${data.benchmark_args.prefill_test.request_rate} req/s</td>
-                                    <td>${data.benchmark_args.decode_test.request_rate} req/s</td>
                                     <td>-</td>
+                                    <td>${data.benchmark_args.decode_test.request_rate} req/s</td>
                                 </tr>
                                 <tr>
                                     <td>Input Length</td>
                                     <td>${data.benchmark_args.prefill_test.input_len} tokens</td>
-                                    <td>${data.benchmark_args.decode_test.input_len} tokens</td>
                                     <td>Prefix: ${data.benchmark_args.cache_test.prefix_len} + Suffix: ${data.benchmark_args.cache_test.suffix_len}</td>
+                                    <td>${data.benchmark_args.decode_test.input_len} tokens</td>
                                 </tr>
                                 <tr>
                                     <td>Output Length</td>
                                     <td>${data.benchmark_args.prefill_test.output_len} tokens</td>
-                                    <td>${data.benchmark_args.decode_test.output_len} tokens</td>
                                     <td>${data.benchmark_args.cache_test.output_len} tokens</td>
+                                    <td>${data.benchmark_args.decode_test.output_len} tokens</td>
                                 </tr>
                                 <tr>
                                     <td>Test Focus</td>
                                     <td>Prefill performance (${data.benchmark_args.prefill_test.ratio})</td>
-                                    <td>Decode performance (${data.benchmark_args.decode_test.ratio})</td>
                                     <td>Cache effectiveness (${data.benchmark_args.cache_test.num_prefixes} unique prefixes)</td>
+                                    <td>Decode performance (${data.benchmark_args.decode_test.ratio})</td>
                                 </tr>
                             </tbody>
                         </table>
