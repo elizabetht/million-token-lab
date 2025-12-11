@@ -24,8 +24,7 @@ RUN --mount=type=cache,target=/root/.cache/pip \
     pip install torch torchvision torchaudio --index-url https://download.pytorch.org/whl/cu130
 
 # Install pre-release deps
-RUN --mount=type=cache,target=/root/.cache/pip \
-    pip install xgrammar triton && \
+RUN --mount=type=cache,target=/root/.cache/pip pip install xgrammar triton && \
     pip install -U --pre flashinfer-python --index-url https://flashinfer.ai/whl/nightly --no-deps && \
     pip install flashinfer-python && \
     pip install -U --pre flashinfer-cubin --index-url https://flashinfer.ai/whl/nightly && \

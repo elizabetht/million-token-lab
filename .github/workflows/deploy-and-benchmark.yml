@@ -109,7 +109,6 @@ jobs:
             --no-enable-prefix-caching \
             --speculative-config '{"method": "draft_model", "model": "${{ env.DRAFT_MODEL }}", "num_speculative_tokens": 3, "disable_padded_drafter_batch": true}'
 
-
       - name: Wait for vLLM server to be ready
         run: |
           echo "Waiting for vLLM server to be ready..."
@@ -212,10 +211,13 @@ jobs:
             vllm bench serve \
             --model ${{ env.MODEL }} \
             --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
+            --dataset-name hf \
+            --dataset-path philschmid/mt-bench \
+            --hf-output-len 512 \
             --num-prompts 100 \
-            --request-rate 10 \
-            --random-input-len 1024 \
-            --random-output-len 3072" \
+            --max-concurrency 100 \
+            --temperature 1.0 \
+            --top-p 1.0" \
             > decode_bench.txt 2>&1 &
           DECODE_PID=$!
           
