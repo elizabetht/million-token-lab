@@ -110,7 +110,7 @@ jobs:
 
       - name: Start vLLM server
         run: |
-          echo "Starting vLLM server with model: ${{ env.MODEL }} (LMCache enabled)"
+          echo "Starting vLLM server with model: ${{ env.MODEL }} (Speculative Decoding enabled)"
           CONTAINER_IMAGE="${FULL_IMAGE:-${{ steps.vars.outputs.FULL_IMAGE }}}"
           echo "Using container image: ${CONTAINER_IMAGE}"
           docker run -d \
@@ -119,16 +119,12 @@ jobs:
             -p ${{ env.DGX_TAILSCALE_IP}}:${{ env.VLLM_PORT }}:8000 \
             -e HF_TOKEN=${{ secrets.HF_TOKEN }} \
             -e FLASHINFER_DISABLE_VERSION_CHECK=1 \
-            -e LMCACHE_LOG_LEVEL=WARNING \
-            -e LMCACHE_CONFIG_FILE=/app/config/lmcache-cpu-offload.yaml \
-            -e LMCACHE_USE_EXPERIMENTAL=True \
             -v $HOME/.cache/huggingface:/root/.cache/huggingface \
             -v ${{ github.workspace }}/config:/app/config:ro \
             "${CONTAINER_IMAGE}" \
             ${{ env.MODEL }} \
             --gpu-memory-utilization ${{ env.GPU_MEMORY_UTILIZATION }} \
-            --kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}' \
-            --speculative-config '{"model": "RedHatAI/Llama-3.1-8B-Instruct-speculator.eagle3", "num_speculative_tokens": 5, "method": "eagle3"}'
+            --speculative-config '{"model": "RedHatAI/Llama-3.1-8B-Instruct-speculator.eagle3", "num_speculative_tokens": 7, "method": "eagle3"}'
 
       - name: Wait for vLLM server to be ready
         run: |
