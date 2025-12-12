@@ -4,6 +4,7 @@ on:
   workflow_run:
     workflows: ["Build and push vLLM image"]
     types: [completed]
+    branches: [main]
   workflow_dispatch:
     inputs:
       image_tag:
@@ -37,7 +38,7 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.event.workflow_run.head_branch || github.ref }}
+          ref: main
 
       - name: Fix Git ownership
         run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
@@ -543,10 +544,6 @@ jobs:
       - name: Commit and push pricing updates
         if: success()
         run: |
-          cd $GITHUB_WORKSPACE
-          pwd
-          ls -la docs/
-          git status
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
           
@@ -561,7 +558,7 @@ jobs:
             MAX_RETRIES=3
             RETRY=0
             while [ $RETRY -lt $MAX_RETRIES ]; do
-              if git push; then
+              if git push origin main; then
                 echo "✅ Pricing and benchmark results updated and pushed"
                 break
               else
