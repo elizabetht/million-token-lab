@@ -116,37 +116,53 @@ jobs:
           GPU_UTIL=${{ env.GPU_MEMORY_UTILIZATION }}
           DGX_COST=$(echo "scale=4; (${{ env.DGX_HARDWARE_COST_PER_HOUR }} * $GPU_UTIL) + ${{ env.DGX_ELECTRICITY_COST_PER_HOUR }}" | bc)
           
-          # Run benchmarks in parallel
+          # Run benchmarks sequentially to avoid issues
+          echo "Running cache benchmark..."
           docker exec ${{ env.CONTAINER_NAME }} bash -c "source /opt/venv/bin/activate && \
             FLASHINFER_DISABLE_VERSION_CHECK=1 vllm bench serve \
             --model ${{ env.MODEL }} --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
             --dataset-name prefix_repetition --num-prompts 100 \
             --prefix-repetition-prefix-len 512 --prefix-repetition-suffix-len 128 \
             --prefix-repetition-num-prefixes 5 --prefix-repetition-output-len 128" \
-            2>&1 | tee cache_bench.txt &
+            2>&1 | tee cache_bench.txt
           
+          echo "Running prefill benchmark..."
           docker exec ${{ env.CONTAINER_NAME }} bash -c "source /opt/venv/bin/activate && \
             FLASHINFER_DISABLE_VERSION_CHECK=1 vllm bench serve \
             --model ${{ env.MODEL }} --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
             --num-prompts 100 --request-rate 10 \
             --random-input-len 3072 --random-output-len 1024" \
-            2>&1 | tee prefill_bench.txt &
+            2>&1 | tee prefill_bench.txt
           
+          echo "Running decode benchmark..."
           docker exec ${{ env.CONTAINER_NAME }} bash -c "source /opt/venv/bin/activate && \
             FLASHINFER_DISABLE_VERSION_CHECK=1 vllm bench serve \
             --model ${{ env.MODEL }} --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
             --num-prompts 100 --request-rate 10 \
             --random-input-len 1024 --random-output-len 3072" \
-            2>&1 | tee decode_bench.txt &
-          
-          wait
+            2>&1 | tee decode_bench.txt
           
           # Extract metrics
-          extract() { grep -oP "$2" "$1" | tail -1 || echo "0"; }
+          extract() { 
+            local result=$(grep -oP "$2" "$1" 2>/dev/null | tail -1)
+            echo "${result:-0}"
+          }
           
           INPUT_TPS=$(extract prefill_bench.txt 'Total token throughput \(tok/s\):\s*\K[\d.]+')
           OUTPUT_TPS=$(extract decode_bench.txt 'Output token throughput \(tok/s\):\s*\K[\d.]+')
           CACHED_TPS=$(extract cache_bench.txt 'Total token throughput \(tok/s\):\s*\K[\d.]+')
+          
+          # Ensure we have valid numbers
+          [[ "$INPUT_TPS" == "0" || -z "$INPUT_TPS" ]] && INPUT_TPS=$(extract prefill_bench.txt 'Output token throughput \(tok/s\):\s*\K[\d.]+')
+          [[ "$OUTPUT_TPS" == "0" || -z "$OUTPUT_TPS" ]] && OUTPUT_TPS=$(extract decode_bench.txt 'Total token throughput \(tok/s\):\s*\K[\d.]+')
+          [[ "$CACHED_TPS" == "0" || -z "$CACHED_TPS" ]] && CACHED_TPS=$(extract cache_bench.txt 'Output token throughput \(tok/s\):\s*\K[\d.]+')
+          
+          # Default to 0 if still empty
+          INPUT_TPS="${INPUT_TPS:-0}"
+          OUTPUT_TPS="${OUTPUT_TPS:-0}"
+          CACHED_TPS="${CACHED_TPS:-0}"
+          
+          echo "Extracted throughput: INPUT=$INPUT_TPS OUTPUT=$OUTPUT_TPS CACHED=$CACHED_TPS"
           
           # Latency metrics
           for test in PREFILL DECODE CACHE; do
@@ -154,18 +170,28 @@ jobs:
             for metric in MEAN_TTFT MEDIAN_TTFT P99_TTFT MEAN_TPOT MEDIAN_TPOT P99_TPOT; do
               pattern=$(echo $metric | sed 's/_/ /g' | sed 's/MEAN/Mean/;s/MEDIAN/Median/;s/P99/P99/;s/TTFT/TTFT/;s/TPOT/TPOT/')
               val=$(extract "$file" "${pattern} \(ms\):\s*\K[\d.]+")
+              val="${val:-0}"
               export "${test}_${metric}=$val"
             done
           done
           
-          # Calculate costs
-          calc_cost() { echo "scale=4; $DGX_COST * 1000000 / ($1 * 3600)" | bc | awk '{printf "%.4f", $0}'; }
+          # Calculate costs (handle division by zero)
+          calc_cost() { 
+            if [ "$1" != "0" ] && [ -n "$1" ]; then
+              echo "scale=4; $DGX_COST * 1000000 / ($1 * 3600)" | bc | awk '{printf "%.4f", $0}'
+            else
+              echo "0"
+            fi
+          }
+          
           COST_IN=$(calc_cost $INPUT_TPS)
           COST_OUT=$(calc_cost $OUTPUT_TPS)
           COST_CACHED=$(calc_cost $CACHED_TPS)
           
           # Export for Python script
-          export MODEL="${{ env.MODEL }}" DGX_COST FULL_IMAGE="${{ steps.vars.outputs.FULL_IMAGE }}"
+          export MODEL="${{ env.MODEL }}" 
+          export DGX_COST 
+          export FULL_IMAGE="${{ steps.vars.outputs.FULL_IMAGE }}"
           export GPU_MEMORY_UTILIZATION="${{ env.GPU_MEMORY_UTILIZATION }}"
           export INPUT_TPS OUTPUT_TPS CACHED_TPS COST_IN COST_OUT COST_CACHED
           export PREFILL_NUM_PROMPTS=100 PREFILL_REQUEST_RATE=10 PREFILL_INPUT_LEN=3072 PREFILL_OUTPUT_LEN=1024
