@@ -125,7 +125,7 @@ jobs:
             -v ${{ github.workspace }}/config:/app/config:ro \
             "${CONTAINER_IMAGE}" \
             ${{ env.MODEL }} \
-            --gpu-memory-utilization 0.3 \
+            --gpu-memory-utilization 0.35 \
            --kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}' \
            --no-enable-prefix-caching \
            --speculative-config '{"model": "RedHatAI/Llama-3.1-8B-Instruct-speculator.eagle3", "num_speculative_tokens": 3, "method": "eagle3"}'
