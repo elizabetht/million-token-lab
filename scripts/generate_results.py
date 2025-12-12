@@ -48,7 +48,7 @@ data = {
         'gpu_memory_utilization': float(os.getenv('GPU_MEMORY_UTILIZATION', '0.3')),
         'max_model_len': 131072,
         'kv_transfer_config': 'LMCacheConnectorV1' if os.getenv('LMCACHE_ENABLED', 'false').lower() == 'true' else None,
-        'prefix_caching': False,
+        'prefix_caching': os.getenv('PREFIX_CACHING_ENABLED', 'false').lower() == 'true',
         'speculative_decoding': os.getenv('SPECULATIVE_DECODING_ENABLED', 'false').lower() == 'true'
     },
     'lmcache_config': {
