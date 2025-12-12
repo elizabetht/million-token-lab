@@ -9,26 +9,53 @@ data = {
     'image_tag': os.getenv('FULL_IMAGE', ''),
     'prefill': {
         'tokens_per_second': float(os.getenv('INPUT_TPS', '0')),
-        'cost_per_million_tokens': float(os.getenv('COST_IN', '0'))
+        'cost_per_million_tokens': float(os.getenv('COST_IN', '0')),
+        'latency': {
+            'mean_ttft_ms': float(os.getenv('PREFILL_MEAN_TTFT', '0')),
+            'median_ttft_ms': float(os.getenv('PREFILL_MEDIAN_TTFT', '0')),
+            'p99_ttft_ms': float(os.getenv('PREFILL_P99_TTFT', '0')),
+            'mean_tpot_ms': float(os.getenv('PREFILL_MEAN_TPOT', '0')),
+            'median_tpot_ms': float(os.getenv('PREFILL_MEDIAN_TPOT', '0')),
+            'p99_tpot_ms': float(os.getenv('PREFILL_P99_TPOT', '0'))
+        }
     },
     'cached': {
         'tokens_per_second': float(os.getenv('CACHED_TPS', '0')),
-        'cost_per_million_tokens': float(os.getenv('COST_CACHED', '0'))
+        'cost_per_million_tokens': float(os.getenv('COST_CACHED', '0')),
+        'latency': {
+            'mean_ttft_ms': float(os.getenv('CACHE_MEAN_TTFT', '0')),
+            'median_ttft_ms': float(os.getenv('CACHE_MEDIAN_TTFT', '0')),
+            'p99_ttft_ms': float(os.getenv('CACHE_P99_TTFT', '0')),
+            'mean_tpot_ms': float(os.getenv('CACHE_MEAN_TPOT', '0')),
+            'median_tpot_ms': float(os.getenv('CACHE_MEDIAN_TPOT', '0')),
+            'p99_tpot_ms': float(os.getenv('CACHE_P99_TPOT', '0'))
+        }
     },
     'decode': {
         'tokens_per_second': float(os.getenv('OUTPUT_TPS', '0')),
-        'cost_per_million_tokens': float(os.getenv('COST_OUT', '0'))
+        'cost_per_million_tokens': float(os.getenv('COST_OUT', '0')),
+        'latency': {
+            'mean_ttft_ms': float(os.getenv('DECODE_MEAN_TTFT', '0')),
+            'median_ttft_ms': float(os.getenv('DECODE_MEDIAN_TTFT', '0')),
+            'p99_ttft_ms': float(os.getenv('DECODE_P99_TTFT', '0')),
+            'mean_tpot_ms': float(os.getenv('DECODE_MEAN_TPOT', '0')),
+            'median_tpot_ms': float(os.getenv('DECODE_MEDIAN_TPOT', '0')),
+            'p99_tpot_ms': float(os.getenv('DECODE_P99_TPOT', '0'))
+        }
     },
     'timestamp': datetime.utcnow().isoformat() + 'Z',
     'vllm_server_args': {
         'gpu_memory_utilization': float(os.getenv('GPU_MEMORY_UTILIZATION', '0.3')),
         'max_model_len': 131072,
-        'kv_transfer_config': None,
+        'kv_transfer_config': 'LMCacheConnectorV1' if os.getenv('LMCACHE_ENABLED', 'false').lower() == 'true' else None,
         'prefix_caching': False,
         'speculative_decoding': os.getenv('SPECULATIVE_DECODING_ENABLED', 'false').lower() == 'true'
     },
     'lmcache_config': {
-        'enabled': False
+        'enabled': os.getenv('LMCACHE_ENABLED', 'false').lower() == 'true',
+        'chunk_size': 8 if os.getenv('LMCACHE_ENABLED', 'false').lower() == 'true' else None,
+        'local_cpu': True if os.getenv('LMCACHE_ENABLED', 'false').lower() == 'true' else None,
+        'max_local_cpu_size': 5.0 if os.getenv('LMCACHE_ENABLED', 'false').lower() == 'true' else None
     },
     'benchmark_args': {
         'prefill_test': {

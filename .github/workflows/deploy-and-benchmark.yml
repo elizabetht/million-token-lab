@@ -110,21 +110,64 @@ jobs:
 
       - name: Start vLLM server
         run: |
-          echo "Starting vLLM server with model: ${{ env.MODEL }} (Speculative Decoding enabled)"
+          VERSION_TAG="${{ steps.vars.outputs.VERSION_TAG }}"
+          echo "Starting vLLM server for version: $VERSION_TAG"
           CONTAINER_IMAGE="${FULL_IMAGE:-${{ steps.vars.outputs.FULL_IMAGE }}}"
           echo "Using container image: ${CONTAINER_IMAGE}"
-          docker run -d \
+          
+          # Determine configuration based on version
+          # v0.1.0: Baseline (no LMCache, no spec decoding)
+          # v0.2.0: LMCache enabled
+          # v0.3.0+: Speculative decoding enabled
+          
+          # Common docker run command parts
+          DOCKER_BASE="docker run -d \
             --gpus all \
             --name ${{ env.CONTAINER_NAME }} \
             -p ${{ env.DGX_TAILSCALE_IP}}:${{ env.VLLM_PORT }}:8000 \
             -e HF_TOKEN=${{ secrets.HF_TOKEN }} \
             -e FLASHINFER_DISABLE_VERSION_CHECK=1 \
-            -v $HOME/.cache/huggingface:/root/.cache/huggingface \
-            -v ${{ github.workspace }}/config:/app/config:ro \
-            "${CONTAINER_IMAGE}" \
-            ${{ env.MODEL }} \
-            --gpu-memory-utilization ${{ env.GPU_MEMORY_UTILIZATION }} \
-            --speculative-config '{"model": "RedHatAI/Llama-3.1-8B-Instruct-speculator.eagle3", "num_speculative_tokens": 7, "method": "eagle3"}'
+            -v \$HOME/.cache/huggingface:/root/.cache/huggingface"
+          
+          # Version-specific configuration
+          case "$VERSION_TAG" in
+            0.1.0|v0.1.0)
+              echo "Configuration: Baseline (no LMCache, no spec decoding)"
+              export LMCACHE_ENABLED="false"
+              export SPECULATIVE_DECODING_ENABLED="false"
+              $DOCKER_BASE \
+                "${CONTAINER_IMAGE}" \
+                ${{ env.MODEL }} \
+                --gpu-memory-utilization 0.3
+              ;;
+            
+            0.2.0|v0.2.0)
+              echo "Configuration: LMCache enabled (CPU offload)"
+              export LMCACHE_ENABLED="true"
+              export SPECULATIVE_DECODING_ENABLED="false"
+              $DOCKER_BASE \
+                -e LMCACHE_LOG_LEVEL=WARNING \
+                -e LMCACHE_CONFIG_FILE=/app/config/lmcache-cpu-offload.yaml \
+                -e LMCACHE_USE_EXPERIMENTAL=True \
+                -v ${{ github.workspace }}/config:/app/config:ro \
+                "${CONTAINER_IMAGE}" \
+                ${{ env.MODEL }} \
+                --gpu-memory-utilization 0.3 \
+                --kv-transfer-config '{"kv_connector":"LMCacheConnectorV1","kv_role":"kv_both"}' \
+                --no-enable-prefix-caching
+              ;;
+            
+            *)
+              echo "Configuration: Speculative Decoding enabled (v0.3.0+)"
+              export LMCACHE_ENABLED="false"
+              export SPECULATIVE_DECODING_ENABLED="true"
+              $DOCKER_BASE \
+                "${CONTAINER_IMAGE}" \
+                ${{ env.MODEL }} \
+                --gpu-memory-utilization ${{ env.GPU_MEMORY_UTILIZATION }} \
+                --speculative-config '{"model": "RedHatAI/Llama-3.1-8B-Instruct-speculator.eagle3", "num_speculative_tokens": 7, "method": "eagle3"}'
+              ;;
+          esac
 
       - name: Wait for vLLM server to be ready
         run: |
@@ -312,31 +355,66 @@ jobs:
           echo "EXTRACTING METRICS FROM ALL BENCHMARKS"
           echo "========================================"
           
-          # Extract prefill throughput (input tokens/s) from prefill-heavy benchmark
-          # Use Total token throughput as the primary metric for prefill-heavy workload
-          PREFILL_TPS=$(grep -oP 'Total token throughput \(tok/s\):\s*\K[\d.]+' prefill_bench.txt | tail -1 || echo "0")
+          # Function to extract metric from benchmark output
+          extract_metric() {
+            local file=$1
+            local pattern=$2
+            grep -oP "$pattern" "$file" | tail -1 || echo "0"
+          }
+          
+          # === PREFILL BENCHMARK METRICS ===
+          echo "Extracting prefill benchmark metrics..."
+          PREFILL_TPS=$(extract_metric prefill_bench.txt 'Total token throughput \(tok/s\):\s*\K[\d.]+')
+          PREFILL_OUTPUT_TPS=$(extract_metric prefill_bench.txt 'Output token throughput \(tok/s\):\s*\K[\d.]+')
+          PREFILL_REQUEST_TPS=$(extract_metric prefill_bench.txt 'Request throughput \(req/s\):\s*\K[\d.]+')
+          PREFILL_MEAN_TTFT=$(extract_metric prefill_bench.txt 'Mean TTFT \(ms\):\s*\K[\d.]+')
+          PREFILL_MEDIAN_TTFT=$(extract_metric prefill_bench.txt 'Median TTFT \(ms\):\s*\K[\d.]+')
+          PREFILL_P99_TTFT=$(extract_metric prefill_bench.txt 'P99 TTFT \(ms\):\s*\K[\d.]+')
+          PREFILL_MEAN_TPOT=$(extract_metric prefill_bench.txt 'Mean TPOT \(ms\):\s*\K[\d.]+')
+          PREFILL_MEDIAN_TPOT=$(extract_metric prefill_bench.txt 'Median TPOT \(ms\):\s*\K[\d.]+')
+          PREFILL_P99_TPOT=$(extract_metric prefill_bench.txt 'P99 TPOT \(ms\):\s*\K[\d.]+')
+          
+          # Fallback if total throughput not found
           if [ "$PREFILL_TPS" = "0" ] || [ -z "$PREFILL_TPS" ]; then
-            # Fallback to output token throughput if total not found
-            PREFILL_TPS=$(grep -oP 'Output token throughput \(tok/s\):\s*\K[\d.]+' prefill_bench.txt | tail -1 || echo "0")
+            PREFILL_TPS="$PREFILL_OUTPUT_TPS"
           fi
-          echo "Prefill throughput: $PREFILL_TPS tokens/s"
+          echo "Prefill - Total throughput: $PREFILL_TPS tok/s, Mean TTFT: $PREFILL_MEAN_TTFT ms, Mean TPOT: $PREFILL_MEAN_TPOT ms"
           
-          # Extract decode throughput (output tokens/s) from decode-heavy benchmark  
-          DECODE_TPS=$(grep -oP 'Output token throughput \(tok/s\):\s*\K[\d.]+' decode_bench.txt | tail -1 || echo "0")
+          # === DECODE BENCHMARK METRICS ===
+          echo "Extracting decode benchmark metrics..."
+          DECODE_OUTPUT_TPS=$(extract_metric decode_bench.txt 'Output token throughput \(tok/s\):\s*\K[\d.]+')
+          DECODE_TOTAL_TPS=$(extract_metric decode_bench.txt 'Total token throughput \(tok/s\):\s*\K[\d.]+')
+          DECODE_REQUEST_TPS=$(extract_metric decode_bench.txt 'Request throughput \(req/s\):\s*\K[\d.]+')
+          DECODE_MEAN_TTFT=$(extract_metric decode_bench.txt 'Mean TTFT \(ms\):\s*\K[\d.]+')
+          DECODE_MEDIAN_TTFT=$(extract_metric decode_bench.txt 'Median TTFT \(ms\):\s*\K[\d.]+')
+          DECODE_P99_TTFT=$(extract_metric decode_bench.txt 'P99 TTFT \(ms\):\s*\K[\d.]+')
+          DECODE_MEAN_TPOT=$(extract_metric decode_bench.txt 'Mean TPOT \(ms\):\s*\K[\d.]+')
+          DECODE_MEDIAN_TPOT=$(extract_metric decode_bench.txt 'Median TPOT \(ms\):\s*\K[\d.]+')
+          DECODE_P99_TPOT=$(extract_metric decode_bench.txt 'P99 TPOT \(ms\):\s*\K[\d.]+')
+          
+          # Use output throughput for decode-heavy workload
+          DECODE_TPS="$DECODE_OUTPUT_TPS"
           if [ "$DECODE_TPS" = "0" ] || [ -z "$DECODE_TPS" ]; then
-            # Fallback to total throughput if output not found
-            DECODE_TPS=$(grep -oP 'Total token throughput \(tok/s\):\s*\K[\d.]+' decode_bench.txt | tail -1 || echo "0")
+            DECODE_TPS="$DECODE_TOTAL_TPS"
           fi
-          echo "Decode throughput: $DECODE_TPS tokens/s"
+          echo "Decode - Output throughput: $DECODE_TPS tok/s, Mean TTFT: $DECODE_MEAN_TTFT ms, Mean TPOT: $DECODE_MEAN_TPOT ms"
           
-          # Extract cached throughput from prefix_repetition benchmark
-          # Use Total token throughput as the primary metric
-          CACHE_TEST_TPS=$(grep -oP 'Total token throughput \(tok/s\):\s*\K[\d.]+' cache_bench.txt | tail -1 || echo "0")
+          # === CACHE BENCHMARK METRICS ===
+          echo "Extracting cache benchmark metrics..."
+          CACHE_TEST_TPS=$(extract_metric cache_bench.txt 'Total token throughput \(tok/s\):\s*\K[\d.]+')
+          CACHE_OUTPUT_TPS=$(extract_metric cache_bench.txt 'Output token throughput \(tok/s\):\s*\K[\d.]+')
+          CACHE_REQUEST_TPS=$(extract_metric cache_bench.txt 'Request throughput \(req/s\):\s*\K[\d.]+')
+          CACHE_MEAN_TTFT=$(extract_metric cache_bench.txt 'Mean TTFT \(ms\):\s*\K[\d.]+')
+          CACHE_MEDIAN_TTFT=$(extract_metric cache_bench.txt 'Median TTFT \(ms\):\s*\K[\d.]+')
+          CACHE_P99_TTFT=$(extract_metric cache_bench.txt 'P99 TTFT \(ms\):\s*\K[\d.]+')
+          CACHE_MEAN_TPOT=$(extract_metric cache_bench.txt 'Mean TPOT \(ms\):\s*\K[\d.]+')
+          CACHE_MEDIAN_TPOT=$(extract_metric cache_bench.txt 'Median TPOT \(ms\):\s*\K[\d.]+')
+          CACHE_P99_TPOT=$(extract_metric cache_bench.txt 'P99 TPOT \(ms\):\s*\K[\d.]+')
+          
           if [ "$CACHE_TEST_TPS" = "0" ] || [ -z "$CACHE_TEST_TPS" ]; then
-            # Fallback to output token throughput
-            CACHE_TEST_TPS=$(grep -oP 'Output token throughput \(tok/s\):\s*\K[\d.]+' cache_bench.txt | tail -1 || echo "0")
+            CACHE_TEST_TPS="$CACHE_OUTPUT_TPS"
           fi
-          echo "Cache test throughput: $CACHE_TEST_TPS tokens/s"
+          echo "Cache - Total throughput: $CACHE_TEST_TPS tok/s, Mean TTFT: $CACHE_MEAN_TTFT ms, Mean TPOT: $CACHE_MEAN_TPOT ms"
           
           # Extract prefix cache hit rate if available from server logs
           CACHE_HIT_RATE="$SERVER_CACHE_HIT_RATE"
@@ -461,6 +539,30 @@ jobs:
           export COST_IN="${COST_IN}"
           export COST_OUT="${COST_OUT}"
           export COST_CACHED="${COST_CACHED}"
+          
+          # Export detailed latency metrics for prefill benchmark
+          export PREFILL_MEAN_TTFT="${PREFILL_MEAN_TTFT}"
+          export PREFILL_MEDIAN_TTFT="${PREFILL_MEDIAN_TTFT}"
+          export PREFILL_P99_TTFT="${PREFILL_P99_TTFT}"
+          export PREFILL_MEAN_TPOT="${PREFILL_MEAN_TPOT}"
+          export PREFILL_MEDIAN_TPOT="${PREFILL_MEDIAN_TPOT}"
+          export PREFILL_P99_TPOT="${PREFILL_P99_TPOT}"
+          
+          # Export detailed latency metrics for decode benchmark
+          export DECODE_MEAN_TTFT="${DECODE_MEAN_TTFT}"
+          export DECODE_MEDIAN_TTFT="${DECODE_MEDIAN_TTFT}"
+          export DECODE_P99_TTFT="${DECODE_P99_TTFT}"
+          export DECODE_MEAN_TPOT="${DECODE_MEAN_TPOT}"
+          export DECODE_MEDIAN_TPOT="${DECODE_MEDIAN_TPOT}"
+          export DECODE_P99_TPOT="${DECODE_P99_TPOT}"
+          
+          # Export detailed latency metrics for cache benchmark
+          export CACHE_MEAN_TTFT="${CACHE_MEAN_TTFT}"
+          export CACHE_MEDIAN_TTFT="${CACHE_MEDIAN_TTFT}"
+          export CACHE_P99_TTFT="${CACHE_P99_TTFT}"
+          export CACHE_MEAN_TPOT="${CACHE_MEAN_TPOT}"
+          export CACHE_MEDIAN_TPOT="${CACHE_MEDIAN_TPOT}"
+          export CACHE_P99_TPOT="${CACHE_P99_TPOT}"
           
           # Benchmark parameters for dynamic HTML generation
           export PREFILL_NUM_PROMPTS="100"
