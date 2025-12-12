@@ -116,22 +116,28 @@ jobs:
           GPU_UTIL=${{ env.GPU_MEMORY_UTILIZATION }}
           DGX_COST=$(echo "scale=4; (${{ env.DGX_HARDWARE_COST_PER_HOUR }} * $GPU_UTIL) + ${{ env.DGX_ELECTRICITY_COST_PER_HOUR }}" | bc)
           
-          # Run benchmarks
-          run_bench() {
-            docker exec ${{ env.CONTAINER_NAME }} bash -c "source /opt/venv/bin/activate && \
-              FLASHINFER_DISABLE_VERSION_CHECK=1 vllm bench serve \
-              --model ${{ env.MODEL }} --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} $@"
-          }
-          
-          run_bench --dataset-name prefix_repetition --num-prompts 100 \
+          # Run benchmarks in parallel
+          docker exec ${{ env.CONTAINER_NAME }} bash -c "source /opt/venv/bin/activate && \
+            FLASHINFER_DISABLE_VERSION_CHECK=1 vllm bench serve \
+            --model ${{ env.MODEL }} --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
+            --dataset-name prefix_repetition --num-prompts 100 \
             --prefix-repetition-prefix-len 512 --prefix-repetition-suffix-len 128 \
-            --prefix-repetition-num-prefixes 5 --prefix-repetition-output-len 128 > cache_bench.txt &
+            --prefix-repetition-num-prefixes 5 --prefix-repetition-output-len 128" \
+            2>&1 | tee cache_bench.txt &
           
-          run_bench --num-prompts 100 --request-rate 10 \
-            --random-input-len 3072 --random-output-len 1024 > prefill_bench.txt &
+          docker exec ${{ env.CONTAINER_NAME }} bash -c "source /opt/venv/bin/activate && \
+            FLASHINFER_DISABLE_VERSION_CHECK=1 vllm bench serve \
+            --model ${{ env.MODEL }} --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
+            --num-prompts 100 --request-rate 10 \
+            --random-input-len 3072 --random-output-len 1024" \
+            2>&1 | tee prefill_bench.txt &
           
-          run_bench --num-prompts 100 --request-rate 10 \
-            --random-input-len 1024 --random-output-len 3072 > decode_bench.txt &
+          docker exec ${{ env.CONTAINER_NAME }} bash -c "source /opt/venv/bin/activate && \
+            FLASHINFER_DISABLE_VERSION_CHECK=1 vllm bench serve \
+            --model ${{ env.MODEL }} --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
+            --num-prompts 100 --request-rate 10 \
+            --random-input-len 1024 --random-output-len 3072" \
+            2>&1 | tee decode_bench.txt &
           
           wait
           
