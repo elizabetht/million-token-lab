@@ -454,6 +454,8 @@ jobs:
           export MODEL="${{ env.MODEL }}"
           export DGX_COST="${DGX_COST}"
           export FULL_IMAGE="${{ steps.vars.outputs.FULL_IMAGE }}"
+          export GPU_MEMORY_UTILIZATION="${{ env.GPU_MEMORY_UTILIZATION }}"
+          export SPECULATIVE_DECODING_ENABLED="true"
           export INPUT_TPS="${INPUT_TPS}"
           export OUTPUT_TPS="${OUTPUT_TPS}"
           export CACHED_TPS="${CACHED_TPS}"

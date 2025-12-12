@@ -21,13 +21,14 @@ data = {
     },
     'timestamp': datetime.utcnow().isoformat() + 'Z',
     'vllm_server_args': {
-        'gpu_memory_utilization': 0.3,
+        'gpu_memory_utilization': float(os.getenv('GPU_MEMORY_UTILIZATION', '0.3')),
         'max_model_len': 131072,
         'kv_transfer_config': {
             'kv_connector': 'LMCacheConnectorV1',
             'kv_role': 'kv_both'
         },
-        'prefix_caching': False
+        'prefix_caching': False,
+        'speculative_decoding': os.getenv('SPECULATIVE_DECODING_ENABLED', 'false').lower() == 'true'
     },
     'lmcache_config': {
         'enabled': True,
