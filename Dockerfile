@@ -32,7 +32,8 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN --mount=type=cache,target=/root/.cache/pip \
     /opt/venv/bin/pip install vllm==0.12.0 lmcache==0.3.9
 
-# Runtime stage with CUDA runtime dependencies
+# Runtime stage - using devel image for CUDA library compatibility
+# (cudnn-runtime lacks libraries needed by PyTorch/vLLM/flashinfer)
 FROM nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04
 
 # Install only runtime Python (no build tools)
