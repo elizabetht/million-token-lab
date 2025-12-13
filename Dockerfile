@@ -32,10 +32,10 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 RUN --mount=type=cache,target=/root/.cache/pip \
     /opt/venv/bin/pip install vllm==0.12.0 lmcache==0.3.9
 
-# Runtime stage with minimal dependencies
-FROM nvidia/cuda:13.0.2-cudnn-runtime-ubuntu24.04
+# Runtime stage with CUDA runtime dependencies
+FROM nvidia/cuda:13.0.2-cudnn-devel-ubuntu24.04
 
-# Install only runtime Python
+# Install only runtime Python (no build tools)
 RUN --mount=type=cache,target=/var/cache/apt \
     --mount=type=cache,target=/var/lib/apt \
     apt-get update && apt-get install -y \
