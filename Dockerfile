@@ -37,8 +37,7 @@ ENV TORCH_USE_CUDA_DSA=0
 RUN --mount=type=cache,target=/root/.cache/pip \
     /opt/venv/bin/pip install vllm==0.12.0 lmcache==0.3.9
 
-# Set environment
-ENV PATH="/opt/venv/bin:$PATH"
+# Set runtime environment
 ENV NVIDIA_VISIBLE_DEVICES=all
 ENV NVIDIA_DRIVER_CAPABILITIES=compute,utility
 
