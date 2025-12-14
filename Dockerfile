@@ -10,10 +10,15 @@ RUN --mount=type=cache,target=/var/cache/apt \
 # Create virtual env
 RUN python3.12 -m venv /opt/venv
 ENV PATH="/opt/venv/bin:$PATH"
+ENV CUDA_HOME=/usr/local/cuda
 
-# Upgrade pip
+# Upgrade pip and install Python build tools
 RUN --mount=type=cache,target=/root/.cache/pip \
-    /opt/venv/bin/pip install --upgrade pip
+    /opt/venv/bin/pip install --upgrade pip setuptools==79.0.1 setuptools_scm packaging wheel
+
+# Install numpy first (required for LMCache CUDA extension build)
+RUN --mount=type=cache,target=/root/.cache/pip \
+    /opt/venv/bin/pip install numpy==1.26.4
 
 # Install PyTorch + CUDA
 RUN --mount=type=cache,target=/root/.cache/pip \
@@ -30,7 +35,6 @@ RUN --mount=type=cache,target=/root/.cache/pip \
 # Set essential environment variables
 ENV TORCH_CUDA_ARCH_LIST="12.1a"
 ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
-ENV CUDA_HOME=/usr/local/cuda
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 ENV TORCH_USE_CUDA_DSA=0
 
