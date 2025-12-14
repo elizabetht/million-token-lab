@@ -38,9 +38,13 @@ ENV TRITON_PTXAS_PATH=/usr/local/cuda/bin/ptxas
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 ENV TORCH_USE_CUDA_DSA=0
 
-# Install vLLM and LMCache from PyPI (replaces source compilation)
+# Install vLLM from PyPI
 RUN --mount=type=cache,target=/root/.cache/pip \
-    /opt/venv/bin/pip install vllm==0.12.0 lmcache==0.3.9
+    /opt/venv/bin/pip install vllm==0.12.0
+
+# Install LMCache from PyPI with --no-build-isolation to use pre-installed numpy
+RUN --mount=type=cache,target=/root/.cache/pip \
+    /opt/venv/bin/pip install --no-build-isolation lmcache==0.3.9
 
 # Set runtime environment
 ENV NVIDIA_VISIBLE_DEVICES=all
