@@ -103,7 +103,7 @@ CMD_OUTPUT=$(docker inspect "$IMAGE_TAG" --format='{{json .Config.Cmd}}' 2>/dev/
 check_contains "CMD contains --kv-transfer-config" "$CMD_OUTPUT" "kv-transfer-config"
 check_contains "CMD contains LMCacheConnectorV1" "$CMD_OUTPUT" "LMCacheConnectorV1"
 check_contains "CMD contains --no-enable-prefix-caching" "$CMD_OUTPUT" "no-enable-prefix-caching"
-check_contains "CMD contains --gpu-memory-utilization" "$CMD_OUTPUT" "gpu-memory-utilization"
+# Note: gpu-memory-utilization is not baked in, allowing runtime configuration
 
 # Test 5: Verify ENTRYPOINT is vllm serve
 echo ""

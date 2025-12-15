@@ -32,9 +32,8 @@ v0.2.0 includes **baked-in LMCache configuration** for optimal prefix caching pe
 - **Chunk Size**: 8 tokens
 - **CPU Offloading**: Enabled with 5.0 GB max cache
 - **KV Transfer**: Bidirectional with LMCacheConnectorV1
-- **GPU Memory**: Conservative 0.3 utilization for stability
 
-All LMCache settings are pre-configured in the Docker image - no runtime environment variables needed.
+All LMCache settings are pre-configured in the Docker image - no runtime environment variables needed. GPU memory utilization can be configured at runtime as needed.
 
 ### Testing LMCache Configuration
 

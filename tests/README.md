@@ -30,7 +30,7 @@ docker build -t vllm-serve:test .
 1. **Config File Presence**: Verifies `/app/config/lmcache-cpu-offload.yaml` exists
 2. **Config File Contents**: Validates chunk_size=8, local_cpu=true, max_local_cpu_size=5.0
 3. **Environment Variables**: Checks LMCACHE_LOG_LEVEL, LMCACHE_CONFIG_FILE, LMCACHE_USE_EXPERIMENTAL
-4. **CMD Arguments**: Verifies --kv-transfer-config, --no-enable-prefix-caching, --gpu-memory-utilization
+4. **CMD Arguments**: Verifies --kv-transfer-config, --no-enable-prefix-caching (gpu-memory-utilization can be set at runtime)
 5. **ENTRYPOINT**: Confirms vllm serve is the entry command
 
 ### Expected Output
@@ -60,7 +60,6 @@ Test 4: Checking default CMD arguments...
 ✓ PASS: CMD contains --kv-transfer-config
 ✓ PASS: CMD contains LMCacheConnectorV1
 ✓ PASS: CMD contains --no-enable-prefix-caching
-✓ PASS: CMD contains --gpu-memory-utilization
 
 Test 5: Checking ENTRYPOINT...
 ✓ PASS: ENTRYPOINT contains vllm
@@ -69,7 +68,7 @@ Test 5: Checking ENTRYPOINT...
 ==========================================
 Test Results Summary
 ==========================================
-Passed: 13
+Passed: 12
 All tests passed!
 
 ✓ LMCache configuration is correctly baked into the Docker image

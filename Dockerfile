@@ -85,6 +85,6 @@ EXPOSE 8000
 # Default vLLM entrypoint with LMCache configuration baked in for v0.2.0
 # - kv-transfer-config: Enables LMCache with bidirectional KV cache transfer
 # - no-enable-prefix-caching: Disables vLLM's built-in prefix caching (LMCache handles this)
-# - gpu-memory-utilization: Conservative 0.3 setting for stability with LMCache
+# Note: gpu-memory-utilization can be configured at runtime as needed
 ENTRYPOINT ["vllm", "serve"]
-CMD ["--kv-transfer-config", "{\"kv_connector\":\"LMCacheConnectorV1\",\"kv_role\":\"kv_both\"}", "--no-enable-prefix-caching", "--gpu-memory-utilization", "0.3"]
+CMD ["--kv-transfer-config", "{\"kv_connector\":\"LMCacheConnectorV1\",\"kv_role\":\"kv_both\"}", "--no-enable-prefix-caching"]
