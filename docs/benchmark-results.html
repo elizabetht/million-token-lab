@@ -570,14 +570,17 @@
                 // Create comparison chart if both versions exist
                 if (v010 && v030) {
                     const compCtx = document.getElementById('comparisonChart').getContext('2d');
-                    const comparisonMetrics = ['Mean TTFT', 'Median TTFT', 'P99 TTFT', 'Mean ITL (TPOT)', 'Median ITL (TPOT)', 'P99 ITL (TPOT)'];
+                    const comparisonMetrics = ['Mean TTFT', 'Median TTFT', 'P99 TTFT', 'Mean TPOT', 'Median TPOT', 'P99 TPOT', 'Mean ITL', 'Median ITL', 'P99 ITL'];
                     const v010Data = [
                         v010.decode.latency.mean_ttft_ms,
                         v010.decode.latency.median_ttft_ms,
                         v010.decode.latency.p99_ttft_ms,
                         v010.decode.latency.mean_tpot_ms,
                         v010.decode.latency.median_tpot_ms,
-                        v010.decode.latency.p99_tpot_ms
+                        v010.decode.latency.p99_tpot_ms,
+                        v010.decode.latency.mean_itl_ms || 0,
+                        v010.decode.latency.median_itl_ms || 0,
+                        v010.decode.latency.p99_itl_ms || 0
                     ];
                     const v030Data = [
                         v030.decode.latency.mean_ttft_ms,
@@ -585,7 +588,10 @@
                         v030.decode.latency.p99_ttft_ms,
                         v030.decode.latency.mean_tpot_ms,
                         v030.decode.latency.median_tpot_ms,
-                        v030.decode.latency.p99_tpot_ms
+                        v030.decode.latency.p99_tpot_ms,
+                        v030.decode.latency.mean_itl_ms || 0,
+                        v030.decode.latency.median_itl_ms || 0,
+                        v030.decode.latency.p99_itl_ms || 0
                     ];
                     
                     new Chart(compCtx, {
@@ -620,7 +626,7 @@
                                     callbacks: {
                                         label: function(context) {
                                             const label = context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' ms';
-                                            // Show improvement for v0.3.0 ITL metrics
+                                            // Show improvement for v0.3.0 TPOT and ITL metrics (indices 3-8)
                                             if (context.datasetIndex === 1 && context.dataIndex >= 3) {
                                                 const improvement = ((v010Data[context.dataIndex] - v030Data[context.dataIndex]) / v010Data[context.dataIndex] * 100).toFixed(1);
                                                 if (improvement > 0) {

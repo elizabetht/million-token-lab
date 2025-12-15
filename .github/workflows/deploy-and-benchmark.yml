@@ -176,8 +176,8 @@ jobs:
           # Latency metrics
           for test in PREFILL DECODE CACHE; do
             file="${test,,}_bench.txt"
-            for metric in MEAN_TTFT MEDIAN_TTFT P99_TTFT MEAN_TPOT MEDIAN_TPOT P99_TPOT; do
-              pattern=$(echo $metric | sed 's/_/ /g' | sed 's/MEAN/Mean/;s/MEDIAN/Median/;s/P99/P99/;s/TTFT/TTFT/;s/TPOT/TPOT/')
+            for metric in MEAN_TTFT MEDIAN_TTFT P99_TTFT MEAN_TPOT MEDIAN_TPOT P99_TPOT MEAN_ITL MEDIAN_ITL P99_ITL; do
+              pattern=$(echo $metric | sed 's/_/ /g' | sed 's/MEAN/Mean/;s/MEDIAN/Median/;s/P99/P99/;s/TTFT/TTFT/;s/TPOT/TPOT/;s/ITL/ITL/')
               val=$(extract "$file" "${pattern} \(ms\):\s*\K[\d.]+")
               val="${val:-0}"
               export "${test}_${metric}=$val"

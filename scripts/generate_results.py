@@ -16,7 +16,10 @@ data = {
             'p99_ttft_ms': float(os.getenv('PREFILL_P99_TTFT', '0')),
             'mean_tpot_ms': float(os.getenv('PREFILL_MEAN_TPOT', '0')),
             'median_tpot_ms': float(os.getenv('PREFILL_MEDIAN_TPOT', '0')),
-            'p99_tpot_ms': float(os.getenv('PREFILL_P99_TPOT', '0'))
+            'p99_tpot_ms': float(os.getenv('PREFILL_P99_TPOT', '0')),
+            'mean_itl_ms': float(os.getenv('PREFILL_MEAN_ITL', '0')),
+            'median_itl_ms': float(os.getenv('PREFILL_MEDIAN_ITL', '0')),
+            'p99_itl_ms': float(os.getenv('PREFILL_P99_ITL', '0'))
         }
     },
     'cached': {
@@ -28,7 +31,10 @@ data = {
             'p99_ttft_ms': float(os.getenv('CACHE_P99_TTFT', '0')),
             'mean_tpot_ms': float(os.getenv('CACHE_MEAN_TPOT', '0')),
             'median_tpot_ms': float(os.getenv('CACHE_MEDIAN_TPOT', '0')),
-            'p99_tpot_ms': float(os.getenv('CACHE_P99_TPOT', '0'))
+            'p99_tpot_ms': float(os.getenv('CACHE_P99_TPOT', '0')),
+            'mean_itl_ms': float(os.getenv('CACHE_MEAN_ITL', '0')),
+            'median_itl_ms': float(os.getenv('CACHE_MEDIAN_ITL', '0')),
+            'p99_itl_ms': float(os.getenv('CACHE_P99_ITL', '0'))
         }
     },
     'decode': {
@@ -40,7 +46,10 @@ data = {
             'p99_ttft_ms': float(os.getenv('DECODE_P99_TTFT', '0')),
             'mean_tpot_ms': float(os.getenv('DECODE_MEAN_TPOT', '0')),
             'median_tpot_ms': float(os.getenv('DECODE_MEDIAN_TPOT', '0')),
-            'p99_tpot_ms': float(os.getenv('DECODE_P99_TPOT', '0'))
+            'p99_tpot_ms': float(os.getenv('DECODE_P99_TPOT', '0')),
+            'mean_itl_ms': float(os.getenv('DECODE_MEAN_ITL', '0')),
+            'median_itl_ms': float(os.getenv('DECODE_MEDIAN_ITL', '0')),
+            'p99_itl_ms': float(os.getenv('DECODE_P99_ITL', '0'))
         }
     },
     'timestamp': datetime.utcnow().isoformat() + 'Z',
