@@ -198,42 +198,51 @@
     "dgx_cost_per_hour": 0.1112,
     "image_tag": "ghcr.io/elizabetht/token-labs/vllm-serve:v0.3.0",
     "prefill": {
-      "tokens_per_second": 491.72,
-      "cost_per_million_tokens": 0.0628,
+      "tokens_per_second": 494.22,
+      "cost_per_million_tokens": 0.0625,
       "latency": {
-        "mean_ttft_ms": 74275.14,
-        "median_ttft_ms": 62961.09,
-        "p99_ttft_ms": 188245.01,
-        "mean_tpot_ms": 615.1,
-        "median_tpot_ms": 590.91,
-        "p99_tpot_ms": 783.98
+        "mean_ttft_ms": 73827.15,
+        "median_ttft_ms": 62624.44,
+        "p99_ttft_ms": 187002.96,
+        "mean_tpot_ms": 611.42,
+        "median_tpot_ms": 587.2,
+        "p99_tpot_ms": 779.78,
+        "mean_itl_ms": 1013.65,
+        "median_itl_ms": 1143.88,
+        "p99_itl_ms": 1435.45
       }
     },
     "cached": {
-      "tokens_per_second": 2697.8,
+      "tokens_per_second": 2707.74,
       "cost_per_million_tokens": 0.0114,
       "latency": {
-        "mean_ttft_ms": 3703.59,
-        "median_ttft_ms": 3592.74,
-        "p99_ttft_ms": 6861.19,
-        "mean_tpot_ms": 174.41,
-        "median_tpot_ms": 176.34,
-        "p99_tpot_ms": 238.41
+        "mean_ttft_ms": 3802.34,
+        "median_ttft_ms": 3498.1,
+        "p99_ttft_ms": 6775.88,
+        "mean_tpot_ms": 174.48,
+        "median_tpot_ms": 176.76,
+        "p99_tpot_ms": 239.97,
+        "mean_itl_ms": 347.3,
+        "median_itl_ms": 341.48,
+        "p99_itl_ms": 687.35
       }
     },
     "decode": {
-      "tokens_per_second": 208.25,
-      "cost_per_million_tokens": 0.1483,
+      "tokens_per_second": 209.11,
+      "cost_per_million_tokens": 0.1477,
       "latency": {
-        "mean_ttft_ms": 544.71,
-        "median_ttft_ms": 527.69,
-        "p99_ttft_ms": 1203.98,
-        "mean_tpot_ms": 356.83,
-        "median_tpot_ms": 400.12,
-        "p99_tpot_ms": 478.25
+        "mean_ttft_ms": 508.91,
+        "median_ttft_ms": 482.48,
+        "p99_ttft_ms": 1151.66,
+        "mean_tpot_ms": 354.5,
+        "median_tpot_ms": 397.63,
+        "p99_tpot_ms": 476.22,
+        "mean_itl_ms": 709.94,
+        "median_itl_ms": 817.08,
+        "p99_itl_ms": 896.62
       }
     },
-    "timestamp": "2025-12-15T05:59:47.580755Z",
+    "timestamp": "2025-12-15T08:07:21.661106Z",
     "vllm_server_args": {
       "gpu_memory_utilization": 0.6,
       "max_model_len": 131072,
