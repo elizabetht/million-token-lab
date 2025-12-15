@@ -113,19 +113,27 @@ jobs:
       - name: Run benchmarks
         id: benchmark
         run: |
+          VERSION="${{ steps.vars.outputs.VERSION_TAG }}"
+          
           # Calculate cost
           GPU_UTIL=${{ env.GPU_MEMORY_UTILIZATION }}
           DGX_COST=$(echo "scale=4; (${{ env.DGX_HARDWARE_COST_PER_HOUR }} * $GPU_UTIL) + ${{ env.DGX_ELECTRICITY_COST_PER_HOUR }}" | bc)
           
           # Run benchmarks sequentially to avoid issues
-          echo "Running cache benchmark..."
-          docker exec ${{ env.CONTAINER_NAME }} bash -c "source /opt/venv/bin/activate && \
-            FLASHINFER_DISABLE_VERSION_CHECK=1 vllm bench serve \
-            --model ${{ env.MODEL }} --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
-            --dataset-name prefix_repetition --num-prompts 100 \
-            --prefix-repetition-prefix-len 512 --prefix-repetition-suffix-len 128 \
-            --prefix-repetition-num-prefixes 5 --prefix-repetition-output-len 128" \
-            2>&1 | tee cache_bench.txt
+          # Skip cache benchmark for v0.1.0 as it doesn't have prefix caching
+          if [[ "$VERSION" != "0.1.0" && "$VERSION" != "v0.1.0" ]]; then
+            echo "Running cache benchmark..."
+            docker exec ${{ env.CONTAINER_NAME }} bash -c "source /opt/venv/bin/activate && \
+              FLASHINFER_DISABLE_VERSION_CHECK=1 vllm bench serve \
+              --model ${{ env.MODEL }} --base-url http://${{ env.DGX_TAILSCALE_IP }}:${{ env.VLLM_PORT }} \
+              --dataset-name prefix_repetition --num-prompts 100 \
+              --prefix-repetition-prefix-len 512 --prefix-repetition-suffix-len 128 \
+              --prefix-repetition-num-prefixes 5 --prefix-repetition-output-len 128" \
+              2>&1 | tee cache_bench.txt
+          else
+            echo "Skipping cache benchmark for v0.1.0 (no prefix caching support)"
+            echo "" > cache_bench.txt
+          fi
           
           echo "Running prefill benchmark..."
           docker exec ${{ env.CONTAINER_NAME }} bash -c "source /opt/venv/bin/activate && \
