@@ -484,9 +484,23 @@
                     
                     ${v010 && v030 ? `
                     <div class="card">
-                        <h2>📊 Decode Performance: Without Spec Dec vs With Spec Dec</h2>
+                        <h2>⏱️ Time to First Token (TTFT) Comparison</h2>
                         <div class="chart-container">
-                            <canvas id="comparisonChart"></canvas>
+                            <canvas id="ttftChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <h2>🔄 Time Per Output Token (TPOT) Comparison</h2>
+                        <div class="chart-container">
+                            <canvas id="tpotChart"></canvas>
+                        </div>
+                    </div>
+                    
+                    <div class="card">
+                        <h2>⚡ Inter-Token Latency (ITL) Comparison</h2>
+                        <div class="chart-container">
+                            <canvas id="itlChart"></canvas>
                         </div>
                     </div>
                     ` : ''}
@@ -567,48 +581,37 @@
                     }
                 });
                 
-                // Create comparison chart if both versions exist
+                // Create separate comparison charts if both versions exist
                 if (v010 && v030) {
-                    const compCtx = document.getElementById('comparisonChart').getContext('2d');
-                    const comparisonMetrics = ['Mean TTFT', 'Median TTFT', 'P99 TTFT', 'Mean TPOT', 'Median TPOT', 'P99 TPOT', 'Mean ITL', 'Median ITL', 'P99 ITL'];
-                    const v010Data = [
+                    // TTFT Comparison Chart
+                    const ttftCtx = document.getElementById('ttftChart').getContext('2d');
+                    const ttftMetrics = ['Mean TTFT', 'Median TTFT', 'P99 TTFT'];
+                    const v010TTFT = [
                         v010.decode.latency.mean_ttft_ms,
                         v010.decode.latency.median_ttft_ms,
-                        v010.decode.latency.p99_ttft_ms,
-                        v010.decode.latency.mean_tpot_ms,
-                        v010.decode.latency.median_tpot_ms,
-                        v010.decode.latency.p99_tpot_ms,
-                        v010.decode.latency.mean_itl_ms || 0,
-                        v010.decode.latency.median_itl_ms || 0,
-                        v010.decode.latency.p99_itl_ms || 0
+                        v010.decode.latency.p99_ttft_ms
                     ];
-                    const v030Data = [
+                    const v030TTFT = [
                         v030.decode.latency.mean_ttft_ms,
                         v030.decode.latency.median_ttft_ms,
-                        v030.decode.latency.p99_ttft_ms,
-                        v030.decode.latency.mean_tpot_ms,
-                        v030.decode.latency.median_tpot_ms,
-                        v030.decode.latency.p99_tpot_ms,
-                        v030.decode.latency.mean_itl_ms || 0,
-                        v030.decode.latency.median_itl_ms || 0,
-                        v030.decode.latency.p99_itl_ms || 0
+                        v030.decode.latency.p99_ttft_ms
                     ];
                     
-                    new Chart(compCtx, {
+                    new Chart(ttftCtx, {
                         type: 'bar',
                         data: {
-                            labels: comparisonMetrics,
+                            labels: ttftMetrics,
                             datasets: [
                                 {
                                     label: 'Without Speculative Decoding (v0.1.0)',
-                                    data: v010Data,
+                                    data: v010TTFT,
                                     backgroundColor: 'rgba(99, 102, 241, 0.8)',
                                     borderColor: '#6366f1',
                                     borderWidth: 1
                                 },
                                 {
                                     label: 'With Speculative Decoding (v0.3.0)',
-                                    data: v030Data,
+                                    data: v030TTFT,
                                     backgroundColor: 'rgba(34, 197, 94, 0.8)',
                                     borderColor: '#22c55e',
                                     borderWidth: 1
@@ -626,9 +629,160 @@
                                     callbacks: {
                                         label: function(context) {
                                             const label = context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' ms';
-                                            // Show improvement for v0.3.0 TPOT and ITL metrics (indices 3-8)
-                                            if (context.datasetIndex === 1 && context.dataIndex >= 3) {
-                                                const improvement = ((v010Data[context.dataIndex] - v030Data[context.dataIndex]) / v010Data[context.dataIndex] * 100).toFixed(1);
+                                            if (context.datasetIndex === 1) {
+                                                const improvement = ((v010TTFT[context.dataIndex] - v030TTFT[context.dataIndex]) / v010TTFT[context.dataIndex] * 100).toFixed(1);
+                                                if (improvement > 0) {
+                                                    return label + ' (' + improvement + '% faster)';
+                                                }
+                                            }
+                                            return label;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    ticks: { color: '#94a3b8' },
+                                    grid: { color: '#334155' }
+                                },
+                                y: {
+                                    ticks: { 
+                                        color: '#94a3b8',
+                                        callback: function(value) {
+                                            return value.toFixed(0) + ' ms';
+                                        }
+                                    },
+                                    grid: { color: '#334155' },
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                    
+                    // TPOT Comparison Chart
+                    const tpotCtx = document.getElementById('tpotChart').getContext('2d');
+                    const tpotMetrics = ['Mean TPOT', 'Median TPOT', 'P99 TPOT'];
+                    const v010TPOT = [
+                        v010.decode.latency.mean_tpot_ms,
+                        v010.decode.latency.median_tpot_ms,
+                        v010.decode.latency.p99_tpot_ms
+                    ];
+                    const v030TPOT = [
+                        v030.decode.latency.mean_tpot_ms,
+                        v030.decode.latency.median_tpot_ms,
+                        v030.decode.latency.p99_tpot_ms
+                    ];
+                    
+                    new Chart(tpotCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: tpotMetrics,
+                            datasets: [
+                                {
+                                    label: 'Without Speculative Decoding (v0.1.0)',
+                                    data: v010TPOT,
+                                    backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                                    borderColor: '#6366f1',
+                                    borderWidth: 1
+                                },
+                                {
+                                    label: 'With Speculative Decoding (v0.3.0)',
+                                    data: v030TPOT,
+                                    backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                                    borderColor: '#22c55e',
+                                    borderWidth: 1
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    labels: { color: '#94a3b8' }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const label = context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' ms';
+                                            if (context.datasetIndex === 1) {
+                                                const improvement = ((v010TPOT[context.dataIndex] - v030TPOT[context.dataIndex]) / v010TPOT[context.dataIndex] * 100).toFixed(1);
+                                                if (improvement > 0) {
+                                                    return label + ' (' + improvement + '% faster)';
+                                                }
+                                            }
+                                            return label;
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    ticks: { color: '#94a3b8' },
+                                    grid: { color: '#334155' }
+                                },
+                                y: {
+                                    ticks: { 
+                                        color: '#94a3b8',
+                                        callback: function(value) {
+                                            return value.toFixed(0) + ' ms';
+                                        }
+                                    },
+                                    grid: { color: '#334155' },
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                    
+                    // ITL Comparison Chart
+                    const itlCtx = document.getElementById('itlChart').getContext('2d');
+                    const itlMetrics = ['Mean ITL', 'Median ITL', 'P99 ITL'];
+                    const v010ITL = [
+                        v010.decode.latency.mean_itl_ms || 0,
+                        v010.decode.latency.median_itl_ms || 0,
+                        v010.decode.latency.p99_itl_ms || 0
+                    ];
+                    const v030ITL = [
+                        v030.decode.latency.mean_itl_ms || 0,
+                        v030.decode.latency.median_itl_ms || 0,
+                        v030.decode.latency.p99_itl_ms || 0
+                    ];
+                    
+                    new Chart(itlCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: itlMetrics,
+                            datasets: [
+                                {
+                                    label: 'Without Speculative Decoding (v0.1.0)',
+                                    data: v010ITL,
+                                    backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                                    borderColor: '#6366f1',
+                                    borderWidth: 1
+                                },
+                                {
+                                    label: 'With Speculative Decoding (v0.3.0)',
+                                    data: v030ITL,
+                                    backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                                    borderColor: '#22c55e',
+                                    borderWidth: 1
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    labels: { color: '#94a3b8' }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            const label = context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' ms';
+                                            if (context.datasetIndex === 1 && v010ITL[context.dataIndex] > 0) {
+                                                const improvement = ((v010ITL[context.dataIndex] - v030ITL[context.dataIndex]) / v010ITL[context.dataIndex] * 100).toFixed(1);
                                                 if (improvement > 0) {
                                                     return label + ' (' + improvement + '% faster)';
                                                 }
