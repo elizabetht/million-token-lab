@@ -68,7 +68,10 @@ data = {
     'vllm_server_args': {
         'gpu_memory_utilization': float(os.getenv('GPU_MEMORY_UTILIZATION', '0.3')),
         'max_model_len': 131072,
-        'kv_transfer_config': 'LMCacheConnectorV1',
+        'kv_transfer_config': {
+            'kv_connector': 'LMCacheConnectorV1',
+            'kv_role': 'kv_both'
+        },
         'prefix_caching': False,
         'speculative_decoding': False
     },
