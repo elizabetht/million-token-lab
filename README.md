@@ -36,6 +36,16 @@ v0.2.0 includes **baked-in LMCache configuration** for optimal prefix caching pe
 
 All LMCache settings are pre-configured in the Docker image - no runtime environment variables needed.
 
+### Testing LMCache Configuration
+
+To verify the LMCache configuration is correctly baked into the Docker image:
+
+```bash
+./test_lmcache_config.sh <image-tag>
+```
+
+See [tests/README.md](tests/README.md) for detailed test documentation.
+
 ## 💰 Cost Economics
 
 DGX Spark running costs:
@@ -62,6 +72,9 @@ DGX Spark running costs:
 ├── scripts/
 │   ├── generate_results.py # Generate benchmark JSON (v0.2.0 LMCache hardcoded)
 │   └── update_pricing.py   # Updates pricing in docs
+├── tests/
+│   └── README.md           # Test documentation
+├── test_lmcache_config.sh  # Functional test for LMCache configuration
 └── .github/workflows/
     ├── build-and-push.yml      # Build vLLM Docker image
     └── deploy-and-benchmark.yml # Deploy and run benchmarks
