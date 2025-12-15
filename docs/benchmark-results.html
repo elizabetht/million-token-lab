@@ -450,17 +450,27 @@
                     const cachedClass = cachedTrend === '↑' ? 'trend-up' : cachedTrend === '↓' ? 'trend-down' : '';
                     const decodeClass = decodeTrend === '↑' ? 'trend-up' : decodeTrend === '↓' ? 'trend-down' : '';
                     
+                    // Hide cost columns for v0.3.0
+                    const hideCost = h.version === '0.3.0';
+                    const costDisplay = hideCost ? '-' : `$${h.prefill?.cost_per_million_tokens?.toFixed(4) || 'N/A'}`;
+                    const cachedCostDisplay = hideCost ? '-' : `$${h.cached?.cost_per_million_tokens?.toFixed(4) || 'N/A'}`;
+                    const decodeCostDisplay = hideCost ? '-' : `$${h.decode?.cost_per_million_tokens?.toFixed(4) || 'N/A'}`;
+                    
                     return `<tr>
                         <td><span class="version-badge">${h.version || 'N/A'}</span></td>
                         <td>${h.timestamp ? new Date(h.timestamp).toLocaleDateString() : 'N/A'}</td>
                         <td class="${prefillClass}">${h.prefill?.tokens_per_second?.toLocaleString() || 'N/A'} ${prefillTrend}</td>
                         <td class="${cachedClass}">${h.cached?.tokens_per_second?.toLocaleString() || 'N/A'} ${cachedTrend}</td>
                         <td class="${decodeClass}">${h.decode?.tokens_per_second?.toLocaleString() || 'N/A'} ${decodeTrend}</td>
-                        <td>$${h.prefill?.cost_per_million_tokens?.toFixed(4) || 'N/A'}</td>
-                        <td>$${h.cached?.cost_per_million_tokens?.toFixed(4) || 'N/A'}</td>
-                        <td>$${h.decode?.cost_per_million_tokens?.toFixed(4) || 'N/A'}</td>
+                        <td>${costDisplay}</td>
+                        <td>${cachedCostDisplay}</td>
+                        <td>${decodeCostDisplay}</td>
                     </tr>`;
                 }).join('');
+                
+                // Create comparison data for v0.1.0 vs v0.3.0
+                const v010 = sortedHistory.find(h => h.version === '0.1.0');
+                const v030 = sortedHistory.find(h => h.version === '0.3.0');
                 
                 historySection.innerHTML = `
                     <div class="card">
@@ -469,6 +479,15 @@
                             <canvas id="historyChart"></canvas>
                         </div>
                     </div>
+                    
+                    ${v010 && v030 ? `
+                    <div class="card">
+                        <h2>📊 v0.1.0 vs v0.3.0 Decode Performance Comparison</h2>
+                        <div class="chart-container">
+                            <canvas id="comparisonChart"></canvas>
+                        </div>
+                    </div>
+                    ` : ''}
                     
                     <div class="card">
                         <h2>📜 Release History</h2>
@@ -553,6 +572,83 @@
                         }
                     }
                 });
+                
+                // Create comparison chart if both versions exist
+                if (v010 && v030) {
+                    const compCtx = document.getElementById('comparisonChart').getContext('2d');
+                    const comparisonMetrics = ['Mean TTFT', 'Median TTFT', 'P99 TTFT', 'Mean TPOT', 'Median TPOT', 'P99 TPOT'];
+                    const v010Data = [
+                        v010.decode.latency.mean_ttft_ms,
+                        v010.decode.latency.median_ttft_ms,
+                        v010.decode.latency.p99_ttft_ms,
+                        v010.decode.latency.mean_tpot_ms,
+                        v010.decode.latency.median_tpot_ms,
+                        v010.decode.latency.p99_tpot_ms
+                    ];
+                    const v030Data = [
+                        v030.decode.latency.mean_ttft_ms,
+                        v030.decode.latency.median_ttft_ms,
+                        v030.decode.latency.p99_ttft_ms,
+                        v030.decode.latency.mean_tpot_ms,
+                        v030.decode.latency.median_tpot_ms,
+                        v030.decode.latency.p99_tpot_ms
+                    ];
+                    
+                    new Chart(compCtx, {
+                        type: 'bar',
+                        data: {
+                            labels: comparisonMetrics,
+                            datasets: [
+                                {
+                                    label: 'v0.1.0 (LMCache)',
+                                    data: v010Data,
+                                    backgroundColor: 'rgba(99, 102, 241, 0.8)',
+                                    borderColor: '#6366f1',
+                                    borderWidth: 1
+                                },
+                                {
+                                    label: 'v0.3.0 (Eagle3 Speculative)',
+                                    data: v030Data,
+                                    backgroundColor: 'rgba(34, 197, 94, 0.8)',
+                                    borderColor: '#22c55e',
+                                    borderWidth: 1
+                                }
+                            ]
+                        },
+                        options: {
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: {
+                                legend: {
+                                    labels: { color: '#94a3b8' }
+                                },
+                                tooltip: {
+                                    callbacks: {
+                                        label: function(context) {
+                                            return context.dataset.label + ': ' + context.parsed.y.toFixed(2) + ' ms';
+                                        }
+                                    }
+                                }
+                            },
+                            scales: {
+                                x: {
+                                    ticks: { color: '#94a3b8' },
+                                    grid: { color: '#334155' }
+                                },
+                                y: {
+                                    ticks: { 
+                                        color: '#94a3b8',
+                                        callback: function(value) {
+                                            return value.toFixed(0) + ' ms';
+                                        }
+                                    },
+                                    grid: { color: '#334155' },
+                                    beginAtZero: true
+                                }
+                            }
+                        }
+                    });
+                }
                 
             } catch (error) {
                 // No history yet, that's okay
